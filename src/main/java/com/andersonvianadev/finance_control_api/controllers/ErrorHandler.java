@@ -1,5 +1,6 @@
 package com.andersonvianadev.finance_control_api.controllers;
 
+import com.andersonvianadev.finance_control_api.infra.exceptions.NotFoundException;
 import com.andersonvianadev.finance_control_api.infra.exceptions.ResourceAlreadyExistsException;
 import com.andersonvianadev.finance_control_api.infra.exceptions.StandardException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -25,6 +26,18 @@ public class ErrorHandler {
     public ResponseEntity<StandardException> validationException(MethodArgumentNotValidException e, HttpServletRequest request) {
         String message = Objects.requireNonNull(e.getBindingResult().getFieldError()).getDefaultMessage();
         StandardException exception = new StandardException(Instant.now(), HttpStatus.BAD_REQUEST.value(), message, request.getRequestURI());
+        return ResponseEntity.status(exception.status()).body(exception);
+    }
+
+    @ExceptionHandler(NotFoundException.class)
+    public ResponseEntity<StandardException> notFoundException(NotFoundException e, HttpServletRequest request) {
+        StandardException exception = new StandardException(Instant.now(), HttpStatus.NOT_FOUND.value(), e.getMessage(), request.getRequestURI());
+        return ResponseEntity.status(exception.status()).body(exception);
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<StandardException> exceptionGeneric(Exception e, HttpServletRequest request) {
+        StandardException exception = new StandardException(Instant.now(), HttpStatus.INTERNAL_SERVER_ERROR.value(), e.getMessage(), request.getRequestURI());
         return ResponseEntity.status(exception.status()).body(exception);
     }
 

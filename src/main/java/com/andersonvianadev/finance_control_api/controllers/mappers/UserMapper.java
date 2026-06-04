@@ -1,8 +1,11 @@
 package com.andersonvianadev.finance_control_api.controllers.mappers;
 
 import com.andersonvianadev.finance_control_api.controllers.dtos.requests.UserRequestDTO;
+import com.andersonvianadev.finance_control_api.controllers.dtos.requests.UserUpdateDTO;
 import com.andersonvianadev.finance_control_api.controllers.dtos.responses.UserResponseDTO;
 import com.andersonvianadev.finance_control_api.domain.models.User;
+
+import java.util.UUID;
 
 public class UserMapper {
 
@@ -11,6 +14,14 @@ public class UserMapper {
                 .name(request.name())
                 .email(request.email())
                 .password(request.password())
+                .build();
+    }
+
+    public static User toDomain(UUID id, UserUpdateDTO update) {
+        return User.builder()
+                .id(id)
+                .name(update.name())
+                .email(update.email())
                 .build();
     }
 
