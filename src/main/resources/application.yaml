@@ -17,6 +17,10 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
 
+  security:
+    secret: ${SECURITY_SECRET}
+    expiration: ${SECURITY_EXPIRATION}
+
 server:
   port: 8080
   servlet:

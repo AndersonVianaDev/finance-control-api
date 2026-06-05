@@ -18,6 +18,10 @@ spring:
     console:
       enabled: false
 
+  security:
+    secret: dev-secret-key-troque-em-producao-min-32-chars
+    expiration: 86400000
+
 server:
   port: 8080
   servlet:
