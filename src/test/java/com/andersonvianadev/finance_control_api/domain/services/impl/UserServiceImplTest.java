@@ -206,4 +206,57 @@ class UserServiceImplTest {
 
         assertThrows(NotFoundException.class, () -> service.update(user));
     }
+
+    @Test
+    @DisplayName("Should throw ResourceAlreadyExistsException when email already exists")
+    void update_ShouldThrowResourceAlreadyExistsException_WhenEmailAlreadyExists() {
+        UUID id = UUID.randomUUID();
+        User userSaved = User.builder()
+                .id(id)
+                .name("Anderson")
+                .email("anderson@gmail.com")
+                .password("Arthur@1406")
+                .build();
+
+        User user = User.builder()
+                .id(id)
+                .name("Anderson12")
+                .email("anderson12@gmail.com")
+                .build();
+
+        doReturn(Optional.of(userSaved)).when(repository).findById(id);
+        doReturn(true).when(repository).existsByEmail(user.getEmail());
+
+        assertThrows(ResourceAlreadyExistsException.class, () -> service.update(user));
+
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Should throw DataIntegrityViolationException when email already exists")
+    void update_ShouldThrowDataIntegrityViolationException_WhenEmailAlreadyExists() {
+        UUID id = UUID.randomUUID();
+        User userSaved = User.builder()
+                .id(id)
+                .name("Anderson")
+                .email("anderson@gmail.com")
+                .password("Arthur@1406")
+                .build();
+
+        User user = User.builder()
+                .id(id)
+                .name("Anderson12")
+                .email("anderson12@gmail.com")
+                .build();
+
+        doReturn(Optional.of(userSaved)).when(repository).findById(id);
+        doReturn(false).when(repository).existsByEmail(user.getEmail());
+
+        doThrow(new DataIntegrityViolationException("email already exists")).when(repository).save(userSaved);
+
+        assertThrows(ResourceAlreadyExistsException.class, () -> service.update(user));
+
+        verify(repository, times(1)).save(any());
+    }
+
 }

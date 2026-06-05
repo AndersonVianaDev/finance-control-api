@@ -1,6 +1,14 @@
 package com.andersonvianadev.finance_control_api.domain.models;
 
-import jakarta.persistence.*;
+import com.andersonvianadev.finance_control_api.domain.models.enums.UserRole;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -19,9 +27,18 @@ public class User {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
+
+    @Column(nullable = false, length = 40)
     private String name;
 
-    @Column(unique = true)
+    @Column(unique = true, nullable = false, length = 60)
     private String email;
+
+    @Column(nullable = false)
     private String password;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 12)
+    @Builder.Default
+    private UserRole role = UserRole.ROLE_USER;
 }

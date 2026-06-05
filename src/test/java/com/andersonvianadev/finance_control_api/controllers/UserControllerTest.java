@@ -4,6 +4,8 @@ import com.andersonvianadev.finance_control_api.controllers.dtos.requests.UserRe
 import com.andersonvianadev.finance_control_api.controllers.dtos.requests.UserUpdateDTO;
 import com.andersonvianadev.finance_control_api.controllers.dtos.responses.UserResponseDTO;
 import com.andersonvianadev.finance_control_api.domain.models.User;
+import com.andersonvianadev.finance_control_api.domain.models.enums.UserRole;
+import com.andersonvianadev.finance_control_api.domain.services.IUserService;
 import com.andersonvianadev.finance_control_api.infra.exceptions.StandardException;
 import com.andersonvianadev.finance_control_api.infra.repositories.UserRepository;
 import org.junit.jupiter.api.*;
@@ -35,6 +37,9 @@ class UserControllerTest {
 
     @Autowired
     private UserRepository repository;
+
+    @Autowired
+    private IUserService userService;
 
     @BeforeEach
     void setup() {
@@ -248,5 +253,42 @@ class UserControllerTest {
         StandardException exception = objectMapper.readValue(content, StandardException.class);
 
         assertEquals(HttpStatus.NOT_FOUND.value(), exception.status());
+    }
+
+    @Test
+    @DisplayName("Should throw ResourceAlreadyExistsException when email already exists")
+    void update_ShouldThrowResourceAlreadyExistsException_WhenEmailAlreadyExists()  throws Exception {
+        User userSaved = User.builder()
+                .name("Anderson")
+                .email("anderson@gmail.com")
+                .password("anderson@12")
+                .build();
+
+        userSaved = repository.save(userSaved);
+
+        User userEmailExists = User.builder()
+                .name("anderson12")
+                .email("anderson12@gmail.com")
+                .password("anderson@12")
+                .build();
+
+        userService.save(userEmailExists);
+
+        UserUpdateDTO update = new UserUpdateDTO("Anderson12", "anderson12@gmail.com");
+
+        String updateJson = objectMapper.writeValueAsString(update);
+
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.put("/users/" + userSaved.getId().toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(updateJson))
+                .andExpect(MockMvcResultMatchers.status().isConflict())
+                .andDo(MockMvcResultHandlers.print())
+                .andReturn();
+
+        String content = result.getResponse().getContentAsString();
+
+        StandardException exception = objectMapper.readValue(content, StandardException.class);
+
+        assertEquals(HttpStatus.CONFLICT.value(), exception.status());
     }
 }
