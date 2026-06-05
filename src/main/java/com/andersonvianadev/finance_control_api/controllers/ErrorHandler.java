@@ -3,9 +3,11 @@ package com.andersonvianadev.finance_control_api.controllers;
 import com.andersonvianadev.finance_control_api.infra.exceptions.NotFoundException;
 import com.andersonvianadev.finance_control_api.infra.exceptions.ResourceAlreadyExistsException;
 import com.andersonvianadev.finance_control_api.infra.exceptions.StandardException;
+import com.andersonvianadev.finance_control_api.infra.exceptions.TokenException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -32,6 +34,20 @@ public class ErrorHandler {
     @ExceptionHandler(NotFoundException.class)
     public ResponseEntity<StandardException> notFoundException(NotFoundException e, HttpServletRequest request) {
         StandardException exception = new StandardException(Instant.now(), HttpStatus.NOT_FOUND.value(), e.getMessage(), request.getRequestURI());
+        return ResponseEntity.status(exception.status()).body(exception);
+    }
+
+    @ExceptionHandler(BadCredentialsException.class)
+    public ResponseEntity<StandardException> badCredentialsException(BadCredentialsException e, HttpServletRequest request) {
+        String message = "Username does not exist or password is invalid.";
+        StandardException exception = new StandardException(Instant.now(), HttpStatus.UNAUTHORIZED.value(), message, request.getRequestURI());
+        return ResponseEntity.status(exception.status()).body(exception);
+    }
+
+    @ExceptionHandler(TokenException.class)
+    public ResponseEntity<StandardException> tokenException(TokenException e, HttpServletRequest request) {
+        String message = "Invalid or expired token";
+        StandardException exception = new StandardException(Instant.now(), HttpStatus.UNAUTHORIZED.value(), message, request.getRequestURI());
         return ResponseEntity.status(exception.status()).body(exception);
     }
 
