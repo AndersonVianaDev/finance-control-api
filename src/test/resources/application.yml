@@ -27,4 +27,10 @@ server:
   servlet:
     context-path: /nix-finance-api
 
+app:
+  saas:
+    plans:
+      free:
+        category-limit: 2
+
 spring.threads.virtual.enabled: true
