@@ -1,8 +1,10 @@
 package com.andersonvianadev.finance_control_api.domain.services.impl;
 
+import com.andersonvianadev.finance_control_api.controllers.dtos.responses.CategoryResponseDTO;
 import com.andersonvianadev.finance_control_api.domain.models.Category;
 import com.andersonvianadev.finance_control_api.domain.models.User;
 import com.andersonvianadev.finance_control_api.domain.models.enums.UserRole;
+import com.andersonvianadev.finance_control_api.infra.exceptions.NotFoundException;
 import com.andersonvianadev.finance_control_api.infra.exceptions.QuotaExceededException;
 import com.andersonvianadev.finance_control_api.infra.exceptions.ResourceAlreadyExistsException;
 import com.andersonvianadev.finance_control_api.infra.repositories.CategoryRepository;
@@ -16,6 +18,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -161,5 +164,50 @@ class CategoryServiceImplTest {
         verify(repository, times(1)).existsByNameAndOwnerOrGlobal(categoryRequest.getName(), user);
         verify(repository, times(1)).countByOwner(any());
         verify(repository, times(1)).save(any());
+    }
+
+    @Test
+    @DisplayName("Should return category when a valid ID is provided")
+    void findById_WhenCategoryExists_ShouldReturnCategory() {
+        User user = User.builder()
+                .id(UUID.randomUUID())
+                .name("anderson")
+                .email("anderson@gmail.com")
+                .password("Arthur@1406")
+                .role(UserRole.ROLE_USER)
+                .build();
+
+        Category category = Category.builder()
+                .id(UUID.randomUUID())
+                .name("food")
+                .description("food")
+                .icon("food")
+                .owner(user)
+                .build();
+
+        doReturn(Optional.of(category)).when(repository).findByIdAndOwnerOrOwnerIsNull(category.getId(), user);
+
+        Category categoryResult = service.findByIdAndOwnerOrOwnerIsNull(category.getId(), user);
+
+        assertEquals(category, categoryResult);
+        verify(repository, times(1)).findByIdAndOwnerOrOwnerIsNull(category.getId(), user);
+    }
+
+    @Test
+    @DisplayName("Should throw NotFoundException when category does not exist")
+    void findById_WhenCategoryDoesNotExist_ShouldThrowNotFoundException() {
+        UUID id = UUID.randomUUID();
+
+        User user = User.builder()
+                .id(UUID.randomUUID())
+                .name("anderson")
+                .email("anderson@gmail.com")
+                .password("Arthur@1406")
+                .role(UserRole.ROLE_USER)
+                .build();
+
+        doReturn(Optional.empty()).when(repository).findByIdAndOwnerOrOwnerIsNull(id, user);
+
+        assertThrows(NotFoundException.class, () -> service.findByIdAndOwnerOrOwnerIsNull(id, user));
     }
 }

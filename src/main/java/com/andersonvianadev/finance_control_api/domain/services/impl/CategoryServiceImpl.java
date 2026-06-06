@@ -5,6 +5,7 @@ import com.andersonvianadev.finance_control_api.domain.models.User;
 import com.andersonvianadev.finance_control_api.domain.models.enums.UserRole;
 import com.andersonvianadev.finance_control_api.domain.services.ICategoryService;
 import com.andersonvianadev.finance_control_api.domain.services.IUserService;
+import com.andersonvianadev.finance_control_api.infra.exceptions.NotFoundException;
 import com.andersonvianadev.finance_control_api.infra.exceptions.QuotaExceededException;
 import com.andersonvianadev.finance_control_api.infra.exceptions.ResourceAlreadyExistsException;
 import com.andersonvianadev.finance_control_api.infra.repositories.CategoryRepository;
@@ -14,7 +15,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
-import java.util.Locale;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -62,5 +63,11 @@ public class CategoryServiceImpl implements ICategoryService {
             throw new ResourceAlreadyExistsException(String.format("A category with this name %s already exists.", category.getName()));
         }
 
+    }
+
+    @Override
+    public Category findByIdAndOwnerOrOwnerIsNull(UUID id, User owner) {
+        return repository.findByIdAndOwnerOrOwnerIsNull(id, owner)
+                .orElseThrow(() -> new NotFoundException(String.format("Category with id %s not found", id.toString())));
     }
 }

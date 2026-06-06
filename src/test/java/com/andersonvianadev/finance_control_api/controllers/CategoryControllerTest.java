@@ -25,6 +25,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.util.UUID;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
@@ -217,5 +219,72 @@ public class CategoryControllerTest {
 
         assertNotNull(exception);
         assertEquals(HttpStatus.BAD_REQUEST.value(), exception.status());
+    }
+
+    @Test
+    @DisplayName("Should return category when a valid ID is provided")
+    void findById_WhenCategoryExists_ShouldReturnCategory() throws Exception {
+        User userSaved = userService.save(
+                User.builder()
+                        .name("Anderson")
+                        .email("anderson@gmail.com")
+                        .password("Arthur@1406")
+                        .role(UserRole.ROLE_USER)
+                        .build()
+        );
+
+        Category categorySaved = repository.save(
+                Category.builder()
+                        .name("Food")
+                        .description("Food description")
+                        .icon("food")
+                        .owner(userSaved)
+                        .build()
+        );
+
+        UserPrincipal userPrincipal = new UserPrincipal(userSaved);
+
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.get("/categories/"+categorySaved.getId())
+                        .with(user(userPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(MockMvcResultMatchers.status().isOk())
+                .andDo(MockMvcResultHandlers.print())
+                .andReturn();
+
+        String content = result.getResponse().getContentAsString();
+
+        CategoryResponseDTO response = objectMapper.readValue(content, CategoryResponseDTO.class);
+
+        assertNotNull(response);
+        assertEquals(userSaved.getId(), response.owner().id());
+    }
+
+    @Test
+    @DisplayName("Should throw NotFoundException when category does not exist")
+    void findById_WhenCategoryDoesNotExist_ShouldThrowNotFoundException() throws Exception {
+        User userSaved = userService.save(
+                User.builder()
+                        .name("Anderson")
+                        .email("anderson@gmail.com")
+                        .password("Arthur@1406")
+                        .role(UserRole.ROLE_USER)
+                        .build()
+        );
+
+        UserPrincipal userPrincipal = new UserPrincipal(userSaved);
+
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.get("/categories/"+ UUID.randomUUID())
+                        .with(user(userPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(MockMvcResultMatchers.status().isNotFound())
+                .andDo(MockMvcResultHandlers.print())
+                .andReturn();
+
+        String content = result.getResponse().getContentAsString();
+
+        StandardException exception = objectMapper.readValue(content, StandardException.class);
+
+        assertNotNull(exception);
+        assertEquals(HttpStatus.NOT_FOUND.value(), exception.status());
     }
 }
