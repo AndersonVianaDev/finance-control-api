@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
@@ -20,4 +21,11 @@ public interface CategoryRepository extends JpaRepository<Category, UUID> {
     boolean existsByNameAndOwnerOrGlobal(@Param("name") String name, @Param("owner") User owner);
 
     Integer countByOwner(User owner);
+
+    @Query("""
+            SELECT c FROM Category c WHERE 1=1
+            AND c.id = :id 
+            AND (c.owner = :owner OR c.owner IS NULL)
+    """)
+    Optional<Category> findByIdAndOwnerOrOwnerIsNull(@Param("id") UUID id, @Param("owner") User owner);
 }
