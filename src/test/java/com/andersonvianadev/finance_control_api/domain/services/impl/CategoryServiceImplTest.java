@@ -1,6 +1,5 @@
 package com.andersonvianadev.finance_control_api.domain.services.impl;
 
-import com.andersonvianadev.finance_control_api.controllers.dtos.responses.CategoryResponseDTO;
 import com.andersonvianadev.finance_control_api.domain.models.Category;
 import com.andersonvianadev.finance_control_api.domain.models.User;
 import com.andersonvianadev.finance_control_api.domain.models.enums.UserRole;
@@ -209,5 +208,53 @@ class CategoryServiceImplTest {
         doReturn(Optional.empty()).when(repository).findByIdAndOwnerOrOwnerIsNull(id, user);
 
         assertThrows(NotFoundException.class, () -> service.findByIdAndOwnerOrOwnerIsNull(id, user));
+    }
+
+    @Test
+    @DisplayName("Should delete category successfully when category exists")
+    void delete_WhenCategoryExists_ShouldDeleteCategory() {
+        User user = User.builder()
+                .id(UUID.randomUUID())
+                .name("anderson")
+                .email("anderson@gmail.com")
+                .password("Arthur@1406")
+                .role(UserRole.ROLE_USER)
+                .build();
+
+        Category category = Category.builder()
+                .id(UUID.randomUUID())
+                .name("food")
+                .description("food")
+                .icon("food")
+                .owner(user)
+                .build();
+
+        doReturn(Optional.of(category)).when(repository).findByIdAndOwner(category.getId(), user);
+
+        service.delete(category.getId(), user);
+
+        verify(repository, times(1)).findByIdAndOwner(category.getId(), user);
+        verify(repository, times(1)).delete(category);
+    }
+
+    @Test
+    @DisplayName("Should throw NotFoundException when category does not exist")
+    void delete_WhenCategoryDoesNotExist_ShouldThrowNotFoundException() {
+        UUID id = UUID.randomUUID();
+
+        User user = User.builder()
+                .id(UUID.randomUUID())
+                .name("anderson")
+                .email("anderson@gmail.com")
+                .password("Arthur@1406")
+                .role(UserRole.ROLE_USER)
+                .build();
+
+        doReturn(Optional.empty()).when(repository).findByIdAndOwner(id, user);
+
+        assertThrows(NotFoundException.class, () -> service.delete(id, user));
+
+        verify(repository, times(1)).findByIdAndOwner(id, user);
+        verify(repository, never()).delete(any());
     }
 }

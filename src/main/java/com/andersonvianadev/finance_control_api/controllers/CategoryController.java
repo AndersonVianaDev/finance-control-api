@@ -43,4 +43,13 @@ public class CategoryController implements ICategoryController {
 
         return ResponseEntity.ok(response);
     }
+
+    @Override
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@AuthenticationPrincipal(expression = "user") User user,
+                                       @PathVariable UUID id) {
+        service.delete(id, user);
+
+        return ResponseEntity.noContent().build();
+    }
 }

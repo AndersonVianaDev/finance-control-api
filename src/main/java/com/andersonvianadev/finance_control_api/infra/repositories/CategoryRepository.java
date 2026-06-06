@@ -28,4 +28,6 @@ public interface CategoryRepository extends JpaRepository<Category, UUID> {
             AND (c.owner = :owner OR c.owner IS NULL)
     """)
     Optional<Category> findByIdAndOwnerOrOwnerIsNull(@Param("id") UUID id, @Param("owner") User owner);
+
+    Optional<Category> findByIdAndOwner(UUID id, User owner);
 }
