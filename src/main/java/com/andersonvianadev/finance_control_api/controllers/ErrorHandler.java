@@ -1,6 +1,7 @@
 package com.andersonvianadev.finance_control_api.controllers;
 
 import com.andersonvianadev.finance_control_api.infra.exceptions.NotFoundException;
+import com.andersonvianadev.finance_control_api.infra.exceptions.QuotaExceededException;
 import com.andersonvianadev.finance_control_api.infra.exceptions.ResourceAlreadyExistsException;
 import com.andersonvianadev.finance_control_api.infra.exceptions.StandardException;
 import com.andersonvianadev.finance_control_api.infra.exceptions.TokenException;
@@ -41,6 +42,12 @@ public class ErrorHandler {
     public ResponseEntity<StandardException> badCredentialsException(BadCredentialsException e, HttpServletRequest request) {
         String message = "Username does not exist or password is invalid.";
         StandardException exception = new StandardException(Instant.now(), HttpStatus.UNAUTHORIZED.value(), message, request.getRequestURI());
+        return ResponseEntity.status(exception.status()).body(exception);
+    }
+
+    @ExceptionHandler(QuotaExceededException.class)
+    public ResponseEntity<StandardException> quotaExceededException(QuotaExceededException e, HttpServletRequest request) {
+        StandardException exception = new StandardException(Instant.now(), HttpStatus.FORBIDDEN.value(), e.getMessage(), request.getRequestURI());
         return ResponseEntity.status(exception.status()).body(exception);
     }
 
