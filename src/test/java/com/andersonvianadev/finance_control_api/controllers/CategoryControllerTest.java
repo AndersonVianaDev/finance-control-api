@@ -287,4 +287,65 @@ public class CategoryControllerTest {
         assertNotNull(exception);
         assertEquals(HttpStatus.NOT_FOUND.value(), exception.status());
     }
+
+    @Test
+    @DisplayName("Should delete category successfully when category exists")
+    void delete_WhenCategoryExists_ShouldDeleteCategory() throws Exception {
+        User userSaved = userService.save(
+                User.builder()
+                        .name("Anderson")
+                        .email("anderson@gmail.com")
+                        .password("Arthur@1406")
+                        .role(UserRole.ROLE_USER)
+                        .build()
+        );
+
+        Category categorySaved = repository.save(
+                Category.builder()
+                        .name("Food")
+                        .description("Food description")
+                        .icon("food")
+                        .owner(userSaved)
+                        .build()
+        );
+
+        UserPrincipal userPrincipal = new UserPrincipal(userSaved);
+
+        mockMvc.perform(MockMvcRequestBuilders.delete("/categories/" + categorySaved.getId())
+                        .with(user(userPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(MockMvcResultMatchers.status().isNoContent())
+                .andDo(MockMvcResultHandlers.print());
+
+        assertEquals(0, repository.count());
+    }
+
+    @Test
+    @DisplayName("Should throw NotFoundException when category does not exist")
+    void delete_WhenCategoryDoesNotExist_ShouldThrowNotFoundException() throws Exception {
+        User userSaved = userService.save(
+                User.builder()
+                        .name("Anderson")
+                        .email("anderson@gmail.com")
+                        .password("Arthur@1406")
+                        .role(UserRole.ROLE_USER)
+                        .build()
+        );
+
+        UserPrincipal userPrincipal = new UserPrincipal(userSaved);
+
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.delete("/categories/" + UUID.randomUUID())
+                        .with(user(userPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(MockMvcResultMatchers.status().isNotFound())
+                .andDo(MockMvcResultHandlers.print())
+                .andReturn();
+
+        String content = result.getResponse().getContentAsString();
+
+        StandardException exception = objectMapper.readValue(content, StandardException.class);
+
+        assertNotNull(exception);
+        assertEquals(HttpStatus.NOT_FOUND.value(), exception.status());
+    }
 }

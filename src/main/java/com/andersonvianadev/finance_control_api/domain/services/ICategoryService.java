@@ -8,4 +8,5 @@ import java.util.UUID;
 public interface ICategoryService {
     Category save(Category category);
     Category findByIdAndOwnerOrOwnerIsNull(UUID id, User owner);
+    void delete(UUID id, User owner);
 }

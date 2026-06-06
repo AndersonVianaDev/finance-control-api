@@ -70,4 +70,12 @@ public class CategoryServiceImpl implements ICategoryService {
         return repository.findByIdAndOwnerOrOwnerIsNull(id, owner)
                 .orElseThrow(() -> new NotFoundException(String.format("Category with id %s not found", id.toString())));
     }
+
+    @Override
+    public void delete(UUID id, User owner) {
+        Category category = repository.findByIdAndOwner(id, owner)
+                .orElseThrow(() -> new NotFoundException(String.format("Category with id %s not found", id.toString())));
+
+        repository.delete(category);
+    }
 }
