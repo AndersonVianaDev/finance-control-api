@@ -21,7 +21,11 @@ public interface IAuthController {
 
     @Operation(
             summary = "User login",
-            description = "Authenticates the user with email and password and returns a JWT token.",
+            description = """
+                    Authenticates the user with email and password and returns a JWT token.
+                    This endpoint has a stricter rate limit per IP to protect against brute-force attacks.
+                    Responses include rate limit headers: X-Rate-Limit-Limit, X-Rate-Limit-Remaining and X-Rate-Limit-Reset.
+                    """,
             responses = {
                     @ApiResponse(
                             responseCode = "200",
@@ -51,7 +55,7 @@ public interface IAuthController {
                                                     {
                                                         "timestamp": "2026-06-04T11:30:00Z",
                                                         "status": 401,
-                                                        "error": "Bad credentials",
+                                                        "error": "Username does not exist or password is invalid.",
                                                         "path": "/nix-finance-api/users/login"
                                                     }
                                                     """
@@ -71,6 +75,25 @@ public interface IAuthController {
                                                         "timestamp": "2026-06-04T11:30:00Z",
                                                         "status": 400,
                                                         "error": "email format is not valid.",
+                                                        "path": "/nix-finance-api/users/login"
+                                                    }
+                                                    """
+                                    )
+                            )
+                    ),
+                    @ApiResponse(
+                            responseCode = "429",
+                            description = "Too many login attempts from the same IP.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = StandardException.class),
+                                    examples = @ExampleObject(
+                                            name = "Rate limit exceeded.",
+                                            value = """
+                                                    {
+                                                        "timestamp": "2026-06-07T17:42:07Z",
+                                                        "status": 429,
+                                                        "error": "Too many requests. Please try again later.",
                                                         "path": "/nix-finance-api/users/login"
                                                     }
                                                     """
