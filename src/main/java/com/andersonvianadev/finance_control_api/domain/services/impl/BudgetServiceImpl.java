@@ -11,6 +11,8 @@ import com.andersonvianadev.finance_control_api.infra.repositories.BudgetReposit
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.UUID;
@@ -86,5 +88,10 @@ public class BudgetServiceImpl implements IBudgetService {
     public void delete(User owner, UUID id) {
         Budget budget = this.findById(owner, id);
         repository.delete(budget);
+    }
+
+    @Override
+    public Page<Budget> findAll(User owner, Pageable pageable) {
+        return repository.findByOwner(owner, pageable);
     }
 }
