@@ -56,4 +56,14 @@ public class BudgetController implements IBudgetController {
         BudgetResponseDTO response = BudgetMapper.toResponse(budget);
         return ResponseEntity.ok(response);
     }
+
+    @Override
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@AuthenticationPrincipal(expression = "user") User user,
+                                       @PathVariable UUID id) {
+        service.delete(user, id);
+        return ResponseEntity.noContent().build();
+    }
+
+
 }
