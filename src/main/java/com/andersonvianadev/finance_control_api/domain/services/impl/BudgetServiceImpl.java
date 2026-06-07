@@ -5,6 +5,7 @@ import com.andersonvianadev.finance_control_api.domain.models.Category;
 import com.andersonvianadev.finance_control_api.domain.models.User;
 import com.andersonvianadev.finance_control_api.domain.services.IBudgetService;
 import com.andersonvianadev.finance_control_api.domain.services.ICategoryService;
+import com.andersonvianadev.finance_control_api.infra.exceptions.NotFoundException;
 import com.andersonvianadev.finance_control_api.infra.exceptions.ResourceAlreadyExistsException;
 import com.andersonvianadev.finance_control_api.infra.repositories.BudgetRepository;
 import lombok.RequiredArgsConstructor;
@@ -54,5 +55,11 @@ public class BudgetServiceImpl implements IBudgetService {
                     String.format("A budget for category %s already exists.", category.getName())
             );
         }
+    }
+
+    @Override
+    public Budget findById(User owner, UUID id) {
+        return repository.findByIdAndOwner(id, owner)
+                .orElseThrow(() -> new NotFoundException(String.format("Budget with id %s not found", id.toString())));
     }
 }

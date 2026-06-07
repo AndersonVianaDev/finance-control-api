@@ -254,4 +254,139 @@ class BudgetControllerTest {
 
         assertEquals(HttpStatus.BAD_REQUEST.value(), exception.status());
     }
+
+    @Test
+    @DisplayName("Should return budget when budget exists")
+    void findById_WhenBudgetExists_ShouldReturnBudget() throws Exception {
+        User userSaved = userService.save(
+                User.builder()
+                        .name("Anderson")
+                        .email("anderson@gmail.com")
+                        .password("Arthur@1406")
+                        .role(UserRole.ROLE_USER)
+                        .build()
+        );
+
+        Category categorySaved = categoryRepository.save(
+                Category.builder()
+                        .name("Food")
+                        .description("Food description")
+                        .icon("food")
+                        .owner(userSaved)
+                        .build()
+        );
+
+        Budget budgetSaved = budgetRepository.save(
+                Budget.builder()
+                        .owner(userSaved)
+                        .category(categorySaved)
+                        .budgetType(BudgetType.MONTHLY)
+                        .limitAmount(new BigDecimal("1500.00"))
+                        .build()
+        );
+
+        UserPrincipal userPrincipal = new UserPrincipal(userSaved);
+
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.get("/budgets/" + budgetSaved.getId())
+                        .with(user(userPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(MockMvcResultMatchers.status().isOk())
+                .andDo(MockMvcResultHandlers.print())
+                .andReturn();
+
+        String content = result.getResponse().getContentAsString();
+
+        BudgetResponseDTO response = objectMapper.readValue(content, BudgetResponseDTO.class);
+
+        assertNotNull(response);
+        assertEquals(userSaved.getId(), response.user().id());
+        assertEquals(categorySaved.getId(), response.category().id());
+        assertEquals(budgetSaved.getBudgetType(), response.budgetType());
+        assertEquals(0, budgetSaved.getLimitAmount().compareTo(response.limitAmount()));
+    }
+
+    @Test
+    @DisplayName("Should throw NotFoundException when budget does not exist")
+    void findById_WhenBudgetDoesNotExist_ShouldThrowNotFoundException() throws Exception {
+        User userSaved = userService.save(
+                User.builder()
+                        .name("Anderson")
+                        .email("anderson@gmail.com")
+                        .password("Arthur@1406")
+                        .role(UserRole.ROLE_USER)
+                        .build()
+        );
+
+        UserPrincipal userPrincipal = new UserPrincipal(userSaved);
+
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.get("/budgets/" + UUID.randomUUID())
+                        .with(user(userPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(MockMvcResultMatchers.status().isNotFound())
+                .andDo(MockMvcResultHandlers.print())
+                .andReturn();
+
+        String content = result.getResponse().getContentAsString();
+
+        StandardException exception = objectMapper.readValue(content, StandardException.class);
+
+        assertNotNull(exception);
+        assertEquals(HttpStatus.NOT_FOUND.value(), exception.status());
+    }
+
+    @Test
+    @DisplayName("Should throw NotFoundException when budget belongs to another user")
+    void findById_WhenBudgetBelongsToAnotherUser_ShouldThrowNotFoundException() throws Exception {
+        User owner = userService.save(
+                User.builder()
+                        .name("Anderson")
+                        .email("anderson@gmail.com")
+                        .password("Arthur@1406")
+                        .role(UserRole.ROLE_USER)
+                        .build()
+        );
+
+        User anotherUser = userService.save(
+                User.builder()
+                        .name("Other")
+                        .email("other@gmail.com")
+                        .password("Other@1234")
+                        .role(UserRole.ROLE_USER)
+                        .build()
+        );
+
+        Category categorySaved = categoryRepository.save(
+                Category.builder()
+                        .name("Food")
+                        .description("Food description")
+                        .icon("food")
+                        .owner(owner)
+                        .build()
+        );
+
+        Budget budgetSaved = budgetRepository.save(
+                Budget.builder()
+                        .owner(owner)
+                        .category(categorySaved)
+                        .budgetType(BudgetType.MONTHLY)
+                        .limitAmount(new BigDecimal("1500.00"))
+                        .build()
+        );
+
+        UserPrincipal anotherUserPrincipal = new UserPrincipal(anotherUser);
+
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.get("/budgets/" + budgetSaved.getId())
+                        .with(user(anotherUserPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(MockMvcResultMatchers.status().isNotFound())
+                .andDo(MockMvcResultHandlers.print())
+                .andReturn();
+
+        String content = result.getResponse().getContentAsString();
+
+        StandardException exception = objectMapper.readValue(content, StandardException.class);
+
+        assertNotNull(exception);
+        assertEquals(HttpStatus.NOT_FOUND.value(), exception.status());
+    }
 }
