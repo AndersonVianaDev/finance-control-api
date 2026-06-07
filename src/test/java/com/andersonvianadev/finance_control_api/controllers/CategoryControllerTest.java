@@ -1,6 +1,7 @@
 package com.andersonvianadev.finance_control_api.controllers;
 
 import com.andersonvianadev.finance_control_api.controllers.dtos.requests.CategoryRequestDTO;
+import com.andersonvianadev.finance_control_api.controllers.dtos.requests.CategoryUpdateDTO;
 import com.andersonvianadev.finance_control_api.controllers.dtos.responses.CategoryResponseDTO;
 import com.andersonvianadev.finance_control_api.domain.models.Category;
 import com.andersonvianadev.finance_control_api.domain.models.User;
@@ -347,5 +348,130 @@ public class CategoryControllerTest {
 
         assertNotNull(exception);
         assertEquals(HttpStatus.NOT_FOUND.value(), exception.status());
+    }
+
+    @Test
+    @DisplayName("Should update category successfully when category exists")
+    void update_WhenCategoryExists_ShouldUpdateCategory() throws Exception {
+        User userSaved = userService.save(
+                User.builder()
+                        .name("Anderson")
+                        .email("anderson@gmail.com")
+                        .password("Arthur@1406")
+                        .role(UserRole.ROLE_USER)
+                        .build()
+        );
+
+        Category categorySaved = repository.save(
+                Category.builder()
+                        .name("Food")
+                        .description("Food description")
+                        .icon("food")
+                        .owner(userSaved)
+                        .build()
+        );
+
+        UserPrincipal userPrincipal = new UserPrincipal(userSaved);
+
+        CategoryUpdateDTO update = new CategoryUpdateDTO("Fitness", "Fitness description", "fitness");
+
+        String updateJson = objectMapper.writeValueAsString(update);
+
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.put("/categories/" + categorySaved.getId())
+                        .with(user(userPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(updateJson))
+                .andExpect(MockMvcResultMatchers.status().isOk())
+                .andDo(MockMvcResultHandlers.print())
+                .andReturn();
+
+        String content = result.getResponse().getContentAsString();
+
+        CategoryResponseDTO response = objectMapper.readValue(content, CategoryResponseDTO.class);
+
+        assertEquals(categorySaved.getId(), response.id());
+        assertEquals(update.name().toLowerCase(), response.name());
+        assertEquals(update.description(), response.description());
+        assertEquals(update.icon(), response.icon());
+    }
+
+    @Test
+    @DisplayName("Should throw NotFoundException when category does not exist")
+    void update_WhenCategoryDoesNotExist_ShouldThrowNotFoundException() throws Exception {
+        User userSaved = userService.save(
+                User.builder()
+                        .name("Anderson")
+                        .email("anderson@gmail.com")
+                        .password("Arthur@1406")
+                        .role(UserRole.ROLE_USER)
+                        .build()
+        );
+
+        UserPrincipal userPrincipal = new UserPrincipal(userSaved);
+
+        CategoryUpdateDTO update = new CategoryUpdateDTO("Fitness", "Fitness description", "fitness");
+
+        String updateJson = objectMapper.writeValueAsString(update);
+
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.put("/categories/" + UUID.randomUUID())
+                        .with(user(userPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(updateJson))
+                .andExpect(MockMvcResultMatchers.status().isNotFound())
+                .andDo(MockMvcResultHandlers.print())
+                .andReturn();
+
+        String content = result.getResponse().getContentAsString();
+
+        StandardException exception = objectMapper.readValue(content, StandardException.class);
+
+        assertNotNull(exception);
+        assertEquals(HttpStatus.NOT_FOUND.value(), exception.status());
+    }
+
+    @Test
+    @DisplayName("Should throw MethodArgumentNotValidException when field invalid")
+    void update_ShouldThrowMethodArgumentNotValidException_WhenFieldInvalid() throws Exception {
+        User userSaved = userService.save(
+                User.builder()
+                        .name("Anderson")
+                        .email("anderson@gmail.com")
+                        .password("Arthur@1406")
+                        .role(UserRole.ROLE_USER)
+                        .build()
+        );
+
+        Category categorySaved = repository.save(
+                Category.builder()
+                        .name("Food")
+                        .description("Food description")
+                        .icon("food")
+                        .owner(userSaved)
+                        .build()
+        );
+
+        UserPrincipal userPrincipal = new UserPrincipal(userSaved);
+
+        CategoryUpdateDTO update = new CategoryUpdateDTO(
+                "Food",
+                "Food description dsdsjdjsdjsjd sdjsjdsjdjsjds sdjsjdsjd sjdsjdsjdjs dsjdsjdsjds",
+                "food");
+
+        String updateJson = objectMapper.writeValueAsString(update);
+
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.put("/categories/" + categorySaved.getId())
+                        .with(user(userPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(updateJson))
+                .andExpect(MockMvcResultMatchers.status().isBadRequest())
+                .andDo(MockMvcResultHandlers.print())
+                .andReturn();
+
+        String content = result.getResponse().getContentAsString();
+
+        StandardException exception = objectMapper.readValue(content, StandardException.class);
+
+        assertNotNull(exception);
+        assertEquals(HttpStatus.BAD_REQUEST.value(), exception.status());
     }
 }
