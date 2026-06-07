@@ -1,14 +1,27 @@
 package com.andersonvianadev.finance_control_api.controllers.mappers;
 
 import com.andersonvianadev.finance_control_api.controllers.dtos.requests.CategoryRequestDTO;
+import com.andersonvianadev.finance_control_api.controllers.dtos.requests.CategoryUpdateDTO;
 import com.andersonvianadev.finance_control_api.controllers.dtos.responses.CategoryResponseDTO;
 import com.andersonvianadev.finance_control_api.domain.models.Category;
 import com.andersonvianadev.finance_control_api.domain.models.User;
+
+import java.util.UUID;
 
 public class CategoryMapper {
 
     public static Category toDomain(User user, CategoryRequestDTO request) {
         return Category.builder()
+                .owner(user)
+                .name(request.name())
+                .description(request.description())
+                .icon(request.icon())
+                .build();
+    }
+
+    public static Category toDomain(User user, UUID id, CategoryUpdateDTO request) {
+        return Category.builder()
+                .id(id)
                 .owner(user)
                 .name(request.name())
                 .description(request.description())

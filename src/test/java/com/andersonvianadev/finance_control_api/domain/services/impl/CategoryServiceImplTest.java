@@ -23,6 +23,7 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
@@ -256,5 +257,73 @@ class CategoryServiceImplTest {
 
         verify(repository, times(1)).findByIdAndOwner(id, user);
         verify(repository, never()).delete(any());
+    }
+
+    @Test
+    @DisplayName("Should update category successfully when category exists")
+    void update_WhenCategoryExists_ShouldUpdateCategory() {
+        User user = User.builder()
+                .id(UUID.randomUUID())
+                .name("anderson")
+                .email("anderson@gmail.com")
+                .password("Arthur@1406")
+                .role(UserRole.ROLE_USER)
+                .build();
+
+        Category categoryActual = Category.builder()
+                .id(UUID.randomUUID())
+                .name("food")
+                .description("food description")
+                .icon("food")
+                .owner(user)
+                .build();
+
+        Category categoryUpdate = Category.builder()
+                .id(categoryActual.getId())
+                .name("fitness")
+                .description("fitness description")
+                .icon("fitness")
+                .owner(user)
+                .build();
+
+        doReturn(Optional.of(categoryActual)).when(repository).findByIdAndOwner(categoryActual.getId(), user);
+        doAnswer(invocation -> invocation.getArgument(0)).when(repository).save(any());
+
+        Category categoryResult = service.update(categoryUpdate);
+
+        assertEquals("fitness", categoryResult.getName());
+        assertEquals("fitness description", categoryResult.getDescription());
+        assertEquals("fitness", categoryResult.getIcon());
+        verify(repository, times(1)).findByIdAndOwner(categoryActual.getId(), user);
+        verify(repository, times(1)).save(categoryActual);
+    }
+
+    @Test
+    @DisplayName("Should throw NotFoundException when category does not exist")
+    void update_WhenCategoryDoesNotExist_ShouldThrowNotFoundException() {
+        UUID id = UUID.randomUUID();
+
+        User user = User.builder()
+                .id(UUID.randomUUID())
+                .name("anderson")
+                .email("anderson@gmail.com")
+                .password("Arthur@1406")
+                .role(UserRole.ROLE_USER)
+                .build();
+
+        Category categoryUpdate = Category.builder()
+                .id(id)
+                .name("fitness")
+                .description("fitness description")
+                .icon("fitness")
+                .owner(user)
+                .build();
+
+        doReturn(Optional.empty()).when(repository).findByIdAndOwner(id, user);
+
+        assertThrows(NotFoundException.class, () -> service.update(categoryUpdate));
+
+        verify(repository, times(1)).findByIdAndOwner(id, user);
+        verify(repository, never()).save(any());
     }
 }
