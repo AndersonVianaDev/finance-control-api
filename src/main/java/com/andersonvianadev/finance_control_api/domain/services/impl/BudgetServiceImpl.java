@@ -62,4 +62,23 @@ public class BudgetServiceImpl implements IBudgetService {
         return repository.findByIdAndOwner(id, owner)
                 .orElseThrow(() -> new NotFoundException(String.format("Budget with id %s not found", id.toString())));
     }
+
+    @Override
+    public Budget update(Budget budget) {
+        Budget budgetSaved = this.findById(budget.getOwner(), budget.getId());
+
+        if(budget.getLimitAmount() != null && !budget.getLimitAmount().equals(budgetSaved.getLimitAmount())) {
+            budgetSaved.setLimitAmount(budget.getLimitAmount());
+        }
+
+        if(budget.getBudgetType() != null && !budget.getBudgetType().equals(budgetSaved.getBudgetType())) {
+            budgetSaved.setBudgetType(budget.getBudgetType());
+        }
+
+        if(budget.getActive() != null && !budget.getActive().equals(budgetSaved.getActive())) {
+            budgetSaved.setActive(budget.getActive());
+        }
+
+        return repository.save(budgetSaved);
+    }
 }
