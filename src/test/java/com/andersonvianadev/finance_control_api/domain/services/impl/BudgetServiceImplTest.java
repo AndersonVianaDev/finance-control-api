@@ -16,8 +16,13 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -376,5 +381,68 @@ class BudgetServiceImplTest {
 
         verify(repository, times(1)).findByIdAndOwner(id, user);
         verify(repository, never()).delete(any());
+    }
+
+    @Test
+    @DisplayName("Should return paginated budgets when budgets exist")
+    void findAll_WhenBudgetsExist_ShouldReturnPageOfBudgets() {
+        User user = User.builder()
+                .id(UUID.randomUUID())
+                .name("Anderson")
+                .email("anderson@gmail.com")
+                .password("password")
+                .role(UserRole.ROLE_USER)
+                .build();
+
+        Category category = Category.builder()
+                .id(UUID.randomUUID())
+                .name("food")
+                .description("food description")
+                .icon("food")
+                .owner(user)
+                .build();
+
+        Budget budget = Budget.builder()
+                .id(UUID.randomUUID())
+                .owner(user)
+                .category(category)
+                .budgetType(BudgetType.MONTHLY)
+                .limitAmount(new BigDecimal("1500.00"))
+                .active(true)
+                .build();
+
+        Pageable pageable = PageRequest.of(0, 10);
+        Page<Budget> page = new PageImpl<>(List.of(budget), pageable, 1);
+
+        doReturn(page).when(repository).findByOwner(user, pageable);
+
+        Page<Budget> result = service.findAll(user, pageable);
+
+        assertEquals(1, result.getTotalElements());
+        assertEquals(budget, result.getContent().getFirst());
+        verify(repository, times(1)).findByOwner(user, pageable);
+    }
+
+    @Test
+    @DisplayName("Should return empty page when no budgets exist")
+    void findAll_WhenNoBudgetsExist_ShouldReturnEmptyPage() {
+        User user = User.builder()
+                .id(UUID.randomUUID())
+                .name("Anderson")
+                .email("anderson@gmail.com")
+                .password("password")
+                .role(UserRole.ROLE_USER)
+                .build();
+
+        Pageable pageable = PageRequest.of(0, 10);
+        Page<Budget> page = new PageImpl<>(List.of(), pageable, 0);
+
+        doReturn(page).when(repository).findByOwner(user, pageable);
+
+        Page<Budget> result = service.findAll(user, pageable);
+
+        assertEquals(0, result.getTotalElements());
+        assertEquals(0, result.getContent().size());
+        verify(repository, times(1)).findByOwner(user, pageable);
     }
 }

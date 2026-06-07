@@ -3,6 +3,7 @@ package com.andersonvianadev.finance_control_api.controllers;
 import com.andersonvianadev.finance_control_api.controllers.dtos.requests.BudgetRequestDTO;
 import com.andersonvianadev.finance_control_api.controllers.dtos.requests.BudgetUpdateDTO;
 import com.andersonvianadev.finance_control_api.controllers.dtos.responses.BudgetResponseDTO;
+import com.andersonvianadev.finance_control_api.controllers.dtos.responses.PageResponseDTO;
 import com.andersonvianadev.finance_control_api.domain.models.Budget;
 import com.andersonvianadev.finance_control_api.domain.models.Category;
 import com.andersonvianadev.finance_control_api.domain.models.User;
@@ -27,6 +28,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.test.web.servlet.result.MockMvcResultHandlers;
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
+import tools.jackson.databind.JavaType;
 import tools.jackson.databind.ObjectMapper;
 
 import java.math.BigDecimal;
@@ -608,5 +610,108 @@ class BudgetControllerTest {
 
         assertNotNull(exception);
         assertEquals(HttpStatus.NOT_FOUND.value(), exception.status());
+    }
+
+    @Test
+    @DisplayName("Should return paginated budgets when budgets exist")
+    void findAll_WhenBudgetsExist_ShouldReturnPageOfBudgets() throws Exception {
+        User userSaved = userService.save(
+                User.builder()
+                        .name("Anderson")
+                        .email("anderson@gmail.com")
+                        .password("Arthur@1406")
+                        .role(UserRole.ROLE_USER)
+                        .build()
+        );
+
+        Category foodCategory = categoryRepository.save(
+                Category.builder()
+                        .name("Food")
+                        .description("Food description")
+                        .icon("food")
+                        .owner(userSaved)
+                        .build()
+        );
+
+        Category fitnessCategory = categoryRepository.save(
+                Category.builder()
+                        .name("Fitness")
+                        .description("Fitness description")
+                        .icon("fitness")
+                        .owner(userSaved)
+                        .build()
+        );
+
+        budgetRepository.save(
+                Budget.builder()
+                        .owner(userSaved)
+                        .category(foodCategory)
+                        .budgetType(BudgetType.MONTHLY)
+                        .limitAmount(new BigDecimal("1500.00"))
+                        .build()
+        );
+
+        budgetRepository.save(
+                Budget.builder()
+                        .owner(userSaved)
+                        .category(fitnessCategory)
+                        .budgetType(BudgetType.WEEKLY)
+                        .limitAmount(new BigDecimal("500.00"))
+                        .build()
+        );
+
+        UserPrincipal userPrincipal = new UserPrincipal(userSaved);
+
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.get("/budgets")
+                        .with(user(userPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(MockMvcResultMatchers.status().isOk())
+                .andDo(MockMvcResultHandlers.print())
+                .andReturn();
+
+        String content = result.getResponse().getContentAsString();
+
+        JavaType pageType = objectMapper.getTypeFactory()
+                .constructParametricType(PageResponseDTO.class, BudgetResponseDTO.class);
+        PageResponseDTO<BudgetResponseDTO> response = objectMapper.readValue(content, pageType);
+
+        assertEquals(2, response.content().size());
+        assertEquals(0, response.page());
+        assertEquals(10, response.size());
+        assertEquals(2, response.totalElement());
+        assertEquals(1, response.totalPages());
+        assertTrue(response.last());
+    }
+
+    @Test
+    @DisplayName("Should return empty page when no budgets exist")
+    void findAll_WhenNoBudgetsExist_ShouldReturnEmptyPage() throws Exception {
+        User userSaved = userService.save(
+                User.builder()
+                        .name("Anderson")
+                        .email("anderson@gmail.com")
+                        .password("Arthur@1406")
+                        .role(UserRole.ROLE_USER)
+                        .build()
+        );
+
+        UserPrincipal userPrincipal = new UserPrincipal(userSaved);
+
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.get("/budgets")
+                        .with(user(userPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(MockMvcResultMatchers.status().isOk())
+                .andDo(MockMvcResultHandlers.print())
+                .andReturn();
+
+        String content = result.getResponse().getContentAsString();
+
+        JavaType pageType = objectMapper.getTypeFactory()
+                .constructParametricType(PageResponseDTO.class, BudgetResponseDTO.class);
+        PageResponseDTO<BudgetResponseDTO> response = objectMapper.readValue(content, pageType);
+
+        assertTrue(response.content().isEmpty());
+        assertEquals(0, response.totalElement());
+        assertTrue(response.last());
     }
 }
