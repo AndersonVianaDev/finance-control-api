@@ -17,11 +17,12 @@ public class UserMapper {
                 .build();
     }
 
-    public static User toDomain(UUID id, UserUpdateDTO update) {
+    public static User toDomain(User user, UserUpdateDTO update) {
         return User.builder()
-                .id(id)
+                .id(user.getId())
                 .name(update.name())
                 .email(update.email())
+                .role(user.getRole())
                 .build();
     }
 
