@@ -7,6 +7,7 @@ import com.andersonvianadev.finance_control_api.domain.models.User;
 import com.andersonvianadev.finance_control_api.domain.models.enums.UserRole;
 import com.andersonvianadev.finance_control_api.domain.services.IUserService;
 import com.andersonvianadev.finance_control_api.infra.exceptions.StandardException;
+import com.andersonvianadev.finance_control_api.infra.repositories.CategoryRepository;
 import com.andersonvianadev.finance_control_api.infra.repositories.UserRepository;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -41,8 +42,12 @@ class UserControllerTest {
     @Autowired
     private IUserService userService;
 
+    @Autowired
+    private CategoryRepository categoryRepository;
+
     @BeforeEach
     void setup() {
+        categoryRepository.deleteAll();
         repository.deleteAll();
     }
 
