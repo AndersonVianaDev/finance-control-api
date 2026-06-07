@@ -29,7 +29,11 @@ public interface IUserController {
 
     @Operation(
             summary = "Register user",
-            description = "Register new users",
+            description = """
+                    Register new users.
+                    This endpoint has a stricter rate limit per IP to protect against abuse.
+                    Responses include rate limit headers: X-Rate-Limit-Limit, X-Rate-Limit-Remaining and X-Rate-Limit-Reset.
+                    """,
             responses = {
                     @ApiResponse(
                             responseCode = "201",
@@ -84,6 +88,25 @@ public interface IUserController {
                                                     "path": "/nix-finance-api/users"
                                                 }
                                                 """
+                                    )
+                            )
+                    ),
+                    @ApiResponse(
+                            responseCode = "429",
+                            description = "Too many registration attempts from the same IP.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = StandardException.class),
+                                    examples = @ExampleObject(
+                                            name = "Rate limit exceeded.",
+                                            value = """
+                                                    {
+                                                        "timestamp": "2026-06-07T17:42:07Z",
+                                                        "status": 429,
+                                                        "error": "Too many requests. Please try again later.",
+                                                        "path": "/nix-finance-api/users"
+                                                    }
+                                                    """
                                     )
                             )
                     )
