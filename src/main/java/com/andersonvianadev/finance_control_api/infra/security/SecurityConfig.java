@@ -1,6 +1,7 @@
 package com.andersonvianadev.finance_control_api.infra.security;
 
 import com.andersonvianadev.finance_control_api.domain.models.enums.UserRole;
+import com.andersonvianadev.finance_control_api.infra.ratelimit.RateLimitFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -20,6 +21,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     private final SecurityFilter securityFilter;
+    private final RateLimitFilter rateLimitFilter;
 
     @Bean
     public SecurityFilterChain configure(HttpSecurity httpSecurity) throws Exception {
@@ -33,6 +35,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.DELETE, "/users/{id}").hasAuthority(UserRole.ROLE_ADMIN.getAuthority())
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         .anyRequest().authenticated())
+                .addFilterBefore(rateLimitFilter, SecurityFilter.class)
                 .addFilterBefore(securityFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }
