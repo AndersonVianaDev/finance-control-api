@@ -1,10 +1,6 @@
 package com.andersonvianadev.finance_control_api.controllers;
 
-import com.andersonvianadev.finance_control_api.infra.exceptions.NotFoundException;
-import com.andersonvianadev.finance_control_api.infra.exceptions.QuotaExceededException;
-import com.andersonvianadev.finance_control_api.infra.exceptions.ResourceAlreadyExistsException;
-import com.andersonvianadev.finance_control_api.infra.exceptions.StandardException;
-import com.andersonvianadev.finance_control_api.infra.exceptions.TokenException;
+import com.andersonvianadev.finance_control_api.infra.exceptions.*;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -47,6 +43,12 @@ public class ErrorHandler {
 
     @ExceptionHandler(QuotaExceededException.class)
     public ResponseEntity<StandardException> quotaExceededException(QuotaExceededException e, HttpServletRequest request) {
+        StandardException exception = new StandardException(Instant.now(), HttpStatus.FORBIDDEN.value(), e.getMessage(), request.getRequestURI());
+        return ResponseEntity.status(exception.status()).body(exception);
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<StandardException> accessDeniedException(AccessDeniedException e, HttpServletRequest request) {
         StandardException exception = new StandardException(Instant.now(), HttpStatus.FORBIDDEN.value(), e.getMessage(), request.getRequestURI());
         return ResponseEntity.status(exception.status()).body(exception);
     }
