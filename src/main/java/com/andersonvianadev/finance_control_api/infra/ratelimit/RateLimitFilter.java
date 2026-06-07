@@ -57,8 +57,29 @@ public class RateLimitFilter extends OncePerRequestFilter {
             return false;
         }
 
-        String path = request.getServletPath();
+        String path = resolveRequestPath(request);
         return "/users/login".equals(path) || "/users".equals(path);
+    }
+
+    private String resolveRequestPath(HttpServletRequest request) {
+        String servletPath = request.getServletPath();
+        if (servletPath != null && !servletPath.isBlank()) {
+            return servletPath;
+        }
+
+        String uri = request.getRequestURI();
+        String contextPath = request.getContextPath();
+
+        if (contextPath != null && !contextPath.isEmpty() && uri.startsWith(contextPath)) {
+            uri = uri.substring(contextPath.length());
+        }
+
+        int queryIndex = uri.indexOf('?');
+        if (queryIndex >= 0) {
+            uri = uri.substring(0, queryIndex);
+        }
+
+        return uri.isEmpty() ? "/" : uri;
     }
 
     private String resolveClientIp(HttpServletRequest request) {
