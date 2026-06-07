@@ -15,7 +15,10 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
+
+import java.util.UUID;
 
 @Tag(
         name = "Budgets",
@@ -171,5 +174,94 @@ public interface IBudgetController {
                     )
             )
             @RequestBody @Valid BudgetRequestDTO request
+    );
+
+    @Operation(
+            summary = "Find budget by ID",
+            description = """
+                    Returns a single budget by its UUID.
+                    The budget must belong to the authenticated user.
+                    """,
+            security = @SecurityRequirement(name = "bearerAuth"),
+            responses = {
+                    @ApiResponse(
+                            responseCode = "200",
+                            description = "Budget found successfully.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = BudgetResponseDTO.class),
+                                    examples = @ExampleObject(
+                                            name = "Budget found.",
+                                            value = """
+                                                    {
+                                                        "user": {
+                                                            "id": "9cb12d90-4623-41c2-b3fc-1a963f77bcf1",
+                                                            "name": "Anderson",
+                                                            "email": "anderson@gmail.com"
+                                                        },
+                                                        "category": {
+                                                            "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+                                                            "name": "Food",
+                                                            "description": "Grocery and restaurant expenses",
+                                                            "icon": "food",
+                                                            "owner": {
+                                                                "id": "9cb12d90-4623-41c2-b3fc-1a963f77bcf1",
+                                                                "name": "Anderson",
+                                                                "email": "anderson@gmail.com"
+                                                            }
+                                                        },
+                                                        "budgetType": "MONTHLY",
+                                                        "limitAmount": 1500.00,
+                                                        "active": true
+                                                    }
+                                                    """
+                                    )
+                            )
+                    ),
+                    @ApiResponse(
+                            responseCode = "404",
+                            description = "Budget not found.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = StandardException.class),
+                                    examples = @ExampleObject(
+                                            name = "Budget not found.",
+                                            value = """
+                                                    {
+                                                        "timestamp": "2026-06-07T09:00:00Z",
+                                                        "status": 404,
+                                                        "error": "Budget with id 3fa85f64-5717-4562-b3fc-2c963f66afa6 not found",
+                                                        "path": "/nix-finance-api/budgets/3fa85f64-5717-4562-b3fc-2c963f66afa6"
+                                                    }
+                                                    """
+                                    )
+                            )
+                    ),
+                    @ApiResponse(
+                            responseCode = "401",
+                            description = "Unauthorized. Missing or invalid JWT token.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = StandardException.class),
+                                    examples = @ExampleObject(
+                                            name = "Missing or invalid token.",
+                                            value = """
+                                                    {
+                                                        "timestamp": "2026-06-07T09:00:00Z",
+                                                        "status": 401,
+                                                        "error": "Unauthorized",
+                                                        "path": "/nix-finance-api/budgets/3fa85f64-5717-4562-b3fc-2c963f66afa6"
+                                                    }
+                                                    """
+                                    )
+                            )
+                    )
+            }
+    )
+    ResponseEntity<BudgetResponseDTO> findById(
+            @Parameter(hidden = true)
+            @AuthenticationPrincipal(expression = "user") User user,
+            @Parameter(description = "UUID of the budget to retrieve.", required = true, example = "3fa85f64-5717-4562-b3fc-2c963f66afa6")
+            @PathVariable UUID id
     );
 }

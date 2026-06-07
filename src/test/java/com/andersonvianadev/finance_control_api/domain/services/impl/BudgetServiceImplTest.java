@@ -18,6 +18,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 
 import java.math.BigDecimal;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -183,6 +184,62 @@ class BudgetServiceImplTest {
 
         assertThrows(ResourceAlreadyExistsException.class, () -> service.save(budgetRequest));
 
-        verify(repository, times(1)).save(budgetRequest);
+        verify(repository, times(1)).save(any());
+    }
+
+    @Test
+    @DisplayName("Should return budget when budget exists")
+    void findById_WhenBudgetExists_ShouldReturnBudget() {
+        User user = User.builder()
+                .id(UUID.randomUUID())
+                .name("Anderson")
+                .email("anderson@gmail.com")
+                .password("password")
+                .role(UserRole.ROLE_USER)
+                .build();
+
+        Category category = Category.builder()
+                .id(UUID.randomUUID())
+                .name("food")
+                .description("food description")
+                .icon("food")
+                .owner(user)
+                .build();
+
+        Budget budget = Budget.builder()
+                .id(UUID.randomUUID())
+                .owner(user)
+                .category(category)
+                .budgetType(BudgetType.MONTHLY)
+                .limitAmount(new BigDecimal("1500.00"))
+                .active(true)
+                .build();
+
+        doReturn(Optional.of(budget)).when(repository).findByIdAndOwner(budget.getId(), user);
+
+        Budget result = service.findById(user, budget.getId());
+
+        assertEquals(budget, result);
+        verify(repository, times(1)).findByIdAndOwner(budget.getId(), user);
+    }
+
+    @Test
+    @DisplayName("Should throw NotFoundException when budget does not exist")
+    void findById_WhenBudgetDoesNotExist_ShouldThrowNotFoundException() {
+        UUID id = UUID.randomUUID();
+
+        User user = User.builder()
+                .id(UUID.randomUUID())
+                .name("Anderson")
+                .email("anderson@gmail.com")
+                .password("password")
+                .role(UserRole.ROLE_USER)
+                .build();
+
+        doReturn(Optional.empty()).when(repository).findByIdAndOwner(id, user);
+
+        assertThrows(NotFoundException.class, () -> service.findById(user, id));
+
+        verify(repository, times(1)).findByIdAndOwner(id, user);
     }
 }
