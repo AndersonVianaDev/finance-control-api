@@ -3,6 +3,7 @@ package com.andersonvianadev.finance_control_api.controllers;
 import com.andersonvianadev.finance_control_api.controllers.dtos.requests.CategoryRequestDTO;
 import com.andersonvianadev.finance_control_api.controllers.dtos.requests.CategoryUpdateDTO;
 import com.andersonvianadev.finance_control_api.controllers.dtos.responses.CategoryResponseDTO;
+import com.andersonvianadev.finance_control_api.controllers.dtos.responses.PageResponseDTO;
 import com.andersonvianadev.finance_control_api.domain.models.Category;
 import com.andersonvianadev.finance_control_api.domain.models.User;
 import com.andersonvianadev.finance_control_api.domain.models.enums.UserRole;
@@ -25,11 +26,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.web.servlet.MockMvc;
+import tools.jackson.databind.JavaType;
 
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 
 @SpringBootTest
@@ -473,5 +476,90 @@ public class CategoryControllerTest {
 
         assertNotNull(exception);
         assertEquals(HttpStatus.BAD_REQUEST.value(), exception.status());
+    }
+
+    @Test
+    @DisplayName("Should return paginated categories when categories exist")
+    void findAll_WhenCategoriesExist_ShouldReturnPageOfCategories() throws Exception {
+        User userSaved = userService.save(
+                User.builder()
+                        .name("Anderson")
+                        .email("anderson@gmail.com")
+                        .password("Arthur@1406")
+                        .role(UserRole.ROLE_USER)
+                        .build()
+        );
+
+        repository.save(
+                Category.builder()
+                        .name("Food")
+                        .description("Food description")
+                        .icon("food")
+                        .owner(userSaved)
+                        .build()
+        );
+
+        repository.save(
+                Category.builder()
+                        .name("Fitness")
+                        .description("Fitness description")
+                        .icon("fitness")
+                        .owner(userSaved)
+                        .build()
+        );
+
+        UserPrincipal userPrincipal = new UserPrincipal(userSaved);
+
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.get("/categories")
+                        .with(user(userPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(MockMvcResultMatchers.status().isOk())
+                .andDo(MockMvcResultHandlers.print())
+                .andReturn();
+
+        String content = result.getResponse().getContentAsString();
+
+        JavaType pageType = objectMapper.getTypeFactory()
+                .constructParametricType(PageResponseDTO.class, CategoryResponseDTO.class);
+        PageResponseDTO<CategoryResponseDTO> response = objectMapper.readValue(content, pageType);
+
+        assertEquals(2, response.content().size());
+        assertEquals(0, response.page());
+        assertEquals(10, response.size());
+        assertEquals(2, response.totalElement());
+        assertEquals(1, response.totalPages());
+        assertTrue(response.last());
+    }
+
+    @Test
+    @DisplayName("Should return empty page when no categories exist")
+    void findAll_WhenNoCategoriesExist_ShouldReturnEmptyPage() throws Exception {
+        User userSaved = userService.save(
+                User.builder()
+                        .name("Anderson")
+                        .email("anderson@gmail.com")
+                        .password("Arthur@1406")
+                        .role(UserRole.ROLE_USER)
+                        .build()
+        );
+
+        UserPrincipal userPrincipal = new UserPrincipal(userSaved);
+
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.get("/categories")
+                        .with(user(userPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(MockMvcResultMatchers.status().isOk())
+                .andDo(MockMvcResultHandlers.print())
+                .andReturn();
+
+        String content = result.getResponse().getContentAsString();
+
+        JavaType pageType = objectMapper.getTypeFactory()
+                .constructParametricType(PageResponseDTO.class, CategoryResponseDTO.class);
+        PageResponseDTO<CategoryResponseDTO> response = objectMapper.readValue(content, pageType);
+
+        assertTrue(response.content().isEmpty());
+        assertEquals(0, response.totalElement());
+        assertTrue(response.last());
     }
 }
