@@ -13,6 +13,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.UUID;
@@ -98,5 +100,10 @@ public class CategoryServiceImpl implements ICategoryService {
         }
 
         return repository.save(categoryActual);
+    }
+
+    @Override
+    public Page<Category> findAll(User owner, Pageable pageable) {
+        return repository.findByOwnerOrOwnerIsNull(owner, pageable);
     }
 }
