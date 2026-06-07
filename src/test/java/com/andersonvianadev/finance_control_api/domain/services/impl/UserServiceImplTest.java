@@ -1,8 +1,9 @@
 package com.andersonvianadev.finance_control_api.domain.services.impl;
 
-import com.andersonvianadev.finance_control_api.controllers.dtos.responses.UserResponseDTO;
 import com.andersonvianadev.finance_control_api.domain.models.User;
+import com.andersonvianadev.finance_control_api.domain.models.enums.UserRole;
 import com.andersonvianadev.finance_control_api.domain.services.IPasswordEncoderService;
+import com.andersonvianadev.finance_control_api.infra.exceptions.AccessDeniedException;
 import com.andersonvianadev.finance_control_api.infra.exceptions.NotFoundException;
 import com.andersonvianadev.finance_control_api.infra.exceptions.ResourceAlreadyExistsException;
 import com.andersonvianadev.finance_control_api.infra.repositories.UserRepository;
@@ -127,33 +128,69 @@ class UserServiceImplTest {
     }
 
     @Test
-    @DisplayName("Should delete user successfully when user exists")
-    void deleteById_WhenUserExists_ShouldDeleteUser() {
-        User user = User.builder()
+    @DisplayName("Should delete user successfully when admin deletes an existing user")
+    void deleteById_WhenAdminAndUserExists_ShouldDeleteUser() {
+        User admin = User.builder()
+                .id(UUID.randomUUID())
+                .name("Admin")
+                .email("admin@gmail.com")
+                .password("Admin@1234")
+                .role(UserRole.ROLE_ADMIN)
+                .build();
+
+        User userToDelete = User.builder()
                 .id(UUID.randomUUID())
                 .name("Anderson")
                 .email("anderson@gmail.com")
                 .password("Anderson@12")
+                .role(UserRole.ROLE_USER)
                 .build();
 
-        doReturn(Optional.of(user)).when(repository).findById(user.getId());
+        doReturn(Optional.of(userToDelete)).when(repository).findById(userToDelete.getId());
 
-        service.deleteById(user.getId());
+        service.deleteById(admin, userToDelete.getId());
 
-        verify(repository, times(1)).findById(any());
-        verify(repository, times(1)).delete(any());
+        verify(repository, times(1)).findById(userToDelete.getId());
+        verify(repository, times(1)).delete(userToDelete);
     }
 
     @Test
     @DisplayName("Should throw NotFoundException when user does not exist")
     void deleteById_WhenUserDoesNotExist_ShouldThrowNotFoundException() {
+        User admin = User.builder()
+                .id(UUID.randomUUID())
+                .name("Admin")
+                .email("admin@gmail.com")
+                .password("Admin@1234")
+                .role(UserRole.ROLE_ADMIN)
+                .build();
+
         UUID id = UUID.randomUUID();
 
         doReturn(Optional.empty()).when(repository).findById(id);
 
-        assertThrows(NotFoundException.class, () -> service.deleteById(id));
+        assertThrows(NotFoundException.class, () -> service.deleteById(admin, id));
 
-        verify(repository, times(1)).findById(any());
+        verify(repository, times(1)).findById(id);
+        verify(repository, never()).delete(any());
+    }
+
+    @Test
+    @DisplayName("Should throw AccessDeniedException when user is not admin")
+    void deleteById_WhenUserIsNotAdmin_ShouldThrowAccessDeniedException() {
+        User user = User.builder()
+                .id(UUID.randomUUID())
+                .name("Anderson")
+                .email("anderson@gmail.com")
+                .password("Anderson@12")
+                .role(UserRole.ROLE_USER)
+                .build();
+
+        UUID id = UUID.randomUUID();
+
+        assertThrows(AccessDeniedException.class, () -> service.deleteById(user, id));
+
+        verify(repository, never()).findById(any());
         verify(repository, never()).delete(any());
     }
 
@@ -194,8 +231,6 @@ class UserServiceImplTest {
     @Test
     @DisplayName("Should throw NotFoundException when user does not exist")
     void update_WhenUserDoesNotExist_ShouldThrowNotFoundException() {
-        UUID id = UUID.randomUUID();
-
         User user = User.builder()
                         .id(UUID.randomUUID())
                         .name("Anderson12")
