@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
@@ -36,10 +37,8 @@ public class UserController implements IUserController {
     }
 
     @Override
-    @GetMapping("/{id}")
-    public ResponseEntity<UserResponseDTO> findById(@PathVariable UUID id) {
-        User user = service.findById(id);
-
+    @GetMapping
+    public ResponseEntity<UserResponseDTO> findById(@AuthenticationPrincipal(expression = "user") User user) {
         UserResponseDTO response = UserMapper.toResponse(user);
 
         return ResponseEntity.ok(response);
@@ -47,15 +46,16 @@ public class UserController implements IUserController {
 
     @Override
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable UUID id) {
-        service.deleteById(id);
+    public ResponseEntity<Void> delete(@AuthenticationPrincipal(expression = "user") User user,
+                                       @PathVariable UUID id) {
+        service.deleteById(user, id);
         return ResponseEntity.noContent().build();
     }
 
     @Override
-    @PutMapping("/{id}")
-    public ResponseEntity<UserResponseDTO> update(@PathVariable UUID id, @RequestBody @Valid UserUpdateDTO update) {
-        User user = UserMapper.toDomain(id, update);
+    @PutMapping
+    public ResponseEntity<UserResponseDTO> update(@AuthenticationPrincipal(expression = "user") User user, @RequestBody @Valid UserUpdateDTO update) {
+        user = UserMapper.toDomain(user, update);
 
         user = service.update(user);
 
