@@ -9,4 +9,5 @@ public interface IBudgetService {
     Budget save(Budget budget);
     Budget findById(User owner, UUID id);
     Budget update(Budget budget);
+    void delete(User owner, UUID id);
 }

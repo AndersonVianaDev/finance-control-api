@@ -81,4 +81,10 @@ public class BudgetServiceImpl implements IBudgetService {
 
         return repository.save(budgetSaved);
     }
+
+    @Override
+    public void delete(User owner, UUID id) {
+        Budget budget = this.findById(owner, id);
+        repository.delete(budget);
+    }
 }
