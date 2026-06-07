@@ -1,6 +1,7 @@
 package com.andersonvianadev.finance_control_api.controllers.docs;
 
 import com.andersonvianadev.finance_control_api.controllers.dtos.requests.BudgetRequestDTO;
+import com.andersonvianadev.finance_control_api.controllers.dtos.requests.BudgetUpdateDTO;
 import com.andersonvianadev.finance_control_api.controllers.dtos.responses.BudgetResponseDTO;
 import com.andersonvianadev.finance_control_api.domain.models.User;
 import com.andersonvianadev.finance_control_api.infra.exceptions.StandardException;
@@ -263,5 +264,137 @@ public interface IBudgetController {
             @AuthenticationPrincipal(expression = "user") User user,
             @Parameter(description = "UUID of the budget to retrieve.", required = true, example = "3fa85f64-5717-4562-b3fc-2c963f66afa6")
             @PathVariable UUID id
+    );
+
+    @Operation(
+            summary = "Update budget",
+            description = """
+                    Updates the limit amount, budget type and/or active status of an existing budget.
+                    Only budgets owned by the authenticated user can be updated.
+                    """,
+            security = @SecurityRequirement(name = "bearerAuth"),
+            responses = {
+                    @ApiResponse(
+                            responseCode = "200",
+                            description = "Budget updated successfully.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = BudgetResponseDTO.class),
+                                    examples = @ExampleObject(
+                                            name = "Budget updated.",
+                                            value = """
+                                                    {
+                                                        "user": {
+                                                            "id": "9cb12d90-4623-41c2-b3fc-1a963f77bcf1",
+                                                            "name": "Anderson",
+                                                            "email": "anderson@gmail.com"
+                                                        },
+                                                        "category": {
+                                                            "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+                                                            "name": "Food",
+                                                            "description": "Grocery and restaurant expenses",
+                                                            "icon": "food",
+                                                            "owner": {
+                                                                "id": "9cb12d90-4623-41c2-b3fc-1a963f77bcf1",
+                                                                "name": "Anderson",
+                                                                "email": "anderson@gmail.com"
+                                                            }
+                                                        },
+                                                        "budgetType": "WEEKLY",
+                                                        "limitAmount": 500.00,
+                                                        "active": false
+                                                    }
+                                                    """
+                                    )
+                            )
+                    ),
+                    @ApiResponse(
+                            responseCode = "404",
+                            description = "Budget not found.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = StandardException.class),
+                                    examples = @ExampleObject(
+                                            name = "Budget not found.",
+                                            value = """
+                                                    {
+                                                        "timestamp": "2026-06-07T09:00:00Z",
+                                                        "status": 404,
+                                                        "error": "Budget with id 3fa85f64-5717-4562-b3fc-2c963f66afa6 not found",
+                                                        "path": "/nix-finance-api/budgets/3fa85f64-5717-4562-b3fc-2c963f66afa6"
+                                                    }
+                                                    """
+                                    )
+                            )
+                    ),
+                    @ApiResponse(
+                            responseCode = "400",
+                            description = "Invalid field value.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = StandardException.class),
+                                    examples = @ExampleObject(
+                                            name = "Active field cannot be null.",
+                                            value = """
+                                                    {
+                                                        "timestamp": "2026-06-07T09:00:00Z",
+                                                        "status": 400,
+                                                        "error": "active field cannot be null.",
+                                                        "path": "/nix-finance-api/budgets/3fa85f64-5717-4562-b3fc-2c963f66afa6"
+                                                    }
+                                                    """
+                                    )
+                            )
+                    ),
+                    @ApiResponse(
+                            responseCode = "401",
+                            description = "Unauthorized. Missing or invalid JWT token.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = StandardException.class),
+                                    examples = @ExampleObject(
+                                            name = "Missing or invalid token.",
+                                            value = """
+                                                    {
+                                                        "timestamp": "2026-06-07T09:00:00Z",
+                                                        "status": 401,
+                                                        "error": "Unauthorized",
+                                                        "path": "/nix-finance-api/budgets/3fa85f64-5717-4562-b3fc-2c963f66afa6"
+                                                    }
+                                                    """
+                                    )
+                            )
+                    )
+            }
+    )
+    ResponseEntity<BudgetResponseDTO> update(
+            @Parameter(hidden = true)
+            @AuthenticationPrincipal(expression = "user") User user,
+            @Parameter(description = "UUID of the budget to update.", required = true, example = "3fa85f64-5717-4562-b3fc-2c963f66afa6")
+            @PathVariable UUID id,
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = """
+                            Fields to update. All fields are required.
+                            Validation rules:
+                                - limitAmount: required, must be a positive value
+                                - budgetType: required (MONTHLY or WEEKLY)
+                                - active: required
+                            """,
+                    required = true,
+                    content = @Content(
+                            schema = @Schema(implementation = BudgetUpdateDTO.class),
+                            examples = @ExampleObject(
+                                    name = "Valid update.",
+                                    value = """
+                                            {
+                                                "limitAmount": 500.00,
+                                                "budgetType": "WEEKLY",
+                                                "active": false
+                                            }
+                                            """
+                            )
+                    )
+            )
+            @RequestBody @Valid BudgetUpdateDTO request
     );
 }

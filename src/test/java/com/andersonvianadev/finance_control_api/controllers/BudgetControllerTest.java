@@ -1,6 +1,7 @@
 package com.andersonvianadev.finance_control_api.controllers;
 
 import com.andersonvianadev.finance_control_api.controllers.dtos.requests.BudgetRequestDTO;
+import com.andersonvianadev.finance_control_api.controllers.dtos.requests.BudgetUpdateDTO;
 import com.andersonvianadev.finance_control_api.controllers.dtos.responses.BudgetResponseDTO;
 import com.andersonvianadev.finance_control_api.domain.models.Budget;
 import com.andersonvianadev.finance_control_api.domain.models.Category;
@@ -388,5 +389,154 @@ class BudgetControllerTest {
 
         assertNotNull(exception);
         assertEquals(HttpStatus.NOT_FOUND.value(), exception.status());
+    }
+
+    @Test
+    @DisplayName("Should update budget successfully when budget exists")
+    void update_WhenBudgetExists_ShouldUpdateBudget() throws Exception {
+        User userSaved = userService.save(
+                User.builder()
+                        .name("Anderson")
+                        .email("anderson@gmail.com")
+                        .password("Arthur@1406")
+                        .role(UserRole.ROLE_USER)
+                        .build()
+        );
+
+        Category categorySaved = categoryRepository.save(
+                Category.builder()
+                        .name("Food")
+                        .description("Food description")
+                        .icon("food")
+                        .owner(userSaved)
+                        .build()
+        );
+
+        Budget budgetSaved = budgetRepository.save(
+                Budget.builder()
+                        .owner(userSaved)
+                        .category(categorySaved)
+                        .budgetType(BudgetType.MONTHLY)
+                        .limitAmount(new BigDecimal("1500.00"))
+                        .build()
+        );
+
+        UserPrincipal userPrincipal = new UserPrincipal(userSaved);
+
+        BudgetUpdateDTO update = new BudgetUpdateDTO(
+                new BigDecimal("500.00"),
+                BudgetType.WEEKLY,
+                false
+        );
+
+        String updateJson = objectMapper.writeValueAsString(update);
+
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.put("/budgets/" + budgetSaved.getId())
+                        .with(user(userPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(updateJson))
+                .andExpect(MockMvcResultMatchers.status().isOk())
+                .andDo(MockMvcResultHandlers.print())
+                .andReturn();
+
+        String content = result.getResponse().getContentAsString();
+
+        BudgetResponseDTO response = objectMapper.readValue(content, BudgetResponseDTO.class);
+
+        assertEquals(update.budgetType(), response.budgetType());
+        assertEquals(0, update.limitAmount().compareTo(response.limitAmount()));
+        assertEquals(update.active(), response.active());
+    }
+
+    @Test
+    @DisplayName("Should throw NotFoundException when budget does not exist")
+    void update_WhenBudgetDoesNotExist_ShouldThrowNotFoundException() throws Exception {
+        User userSaved = userService.save(
+                User.builder()
+                        .name("Anderson")
+                        .email("anderson@gmail.com")
+                        .password("Arthur@1406")
+                        .role(UserRole.ROLE_USER)
+                        .build()
+        );
+
+        UserPrincipal userPrincipal = new UserPrincipal(userSaved);
+
+        BudgetUpdateDTO update = new BudgetUpdateDTO(
+                new BigDecimal("500.00"),
+                BudgetType.WEEKLY,
+                false
+        );
+
+        String updateJson = objectMapper.writeValueAsString(update);
+
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.put("/budgets/" + UUID.randomUUID())
+                        .with(user(userPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(updateJson))
+                .andExpect(MockMvcResultMatchers.status().isNotFound())
+                .andDo(MockMvcResultHandlers.print())
+                .andReturn();
+
+        String content = result.getResponse().getContentAsString();
+
+        StandardException exception = objectMapper.readValue(content, StandardException.class);
+
+        assertNotNull(exception);
+        assertEquals(HttpStatus.NOT_FOUND.value(), exception.status());
+    }
+
+    @Test
+    @DisplayName("Should throw MethodArgumentNotValidException when field invalid")
+    void update_ShouldThrowMethodArgumentNotValidException_WhenFieldInvalid() throws Exception {
+        User userSaved = userService.save(
+                User.builder()
+                        .name("Anderson")
+                        .email("anderson@gmail.com")
+                        .password("Arthur@1406")
+                        .role(UserRole.ROLE_USER)
+                        .build()
+        );
+
+        Category categorySaved = categoryRepository.save(
+                Category.builder()
+                        .name("Food")
+                        .description("Food description")
+                        .icon("food")
+                        .owner(userSaved)
+                        .build()
+        );
+
+        Budget budgetSaved = budgetRepository.save(
+                Budget.builder()
+                        .owner(userSaved)
+                        .category(categorySaved)
+                        .budgetType(BudgetType.MONTHLY)
+                        .limitAmount(new BigDecimal("1500.00"))
+                        .build()
+        );
+
+        UserPrincipal userPrincipal = new UserPrincipal(userSaved);
+
+        String updateJson = """
+                {
+                    "limitAmount": 500.00,
+                    "budgetType": "WEEKLY"
+                }
+                """;
+
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.put("/budgets/" + budgetSaved.getId())
+                        .with(user(userPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(updateJson))
+                .andExpect(MockMvcResultMatchers.status().isBadRequest())
+                .andDo(MockMvcResultHandlers.print())
+                .andReturn();
+
+        String content = result.getResponse().getContentAsString();
+
+        StandardException exception = objectMapper.readValue(content, StandardException.class);
+
+        assertEquals(HttpStatus.BAD_REQUEST.value(), exception.status());
     }
 }

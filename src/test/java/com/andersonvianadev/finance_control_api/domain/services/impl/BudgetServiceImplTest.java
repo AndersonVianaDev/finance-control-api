@@ -24,6 +24,7 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
@@ -241,5 +242,82 @@ class BudgetServiceImplTest {
         assertThrows(NotFoundException.class, () -> service.findById(user, id));
 
         verify(repository, times(1)).findByIdAndOwner(id, user);
+    }
+
+    @Test
+    @DisplayName("Should update budget successfully when budget exists")
+    void update_WhenBudgetExists_ShouldUpdateBudget() {
+        User user = User.builder()
+                .id(UUID.randomUUID())
+                .name("Anderson")
+                .email("anderson@gmail.com")
+                .password("password")
+                .role(UserRole.ROLE_USER)
+                .build();
+
+        Category category = Category.builder()
+                .id(UUID.randomUUID())
+                .name("food")
+                .description("food description")
+                .icon("food")
+                .owner(user)
+                .build();
+
+        Budget budgetSaved = Budget.builder()
+                .id(UUID.randomUUID())
+                .owner(user)
+                .category(category)
+                .budgetType(BudgetType.MONTHLY)
+                .limitAmount(new BigDecimal("1500.00"))
+                .active(true)
+                .build();
+
+        Budget budgetUpdate = Budget.builder()
+                .id(budgetSaved.getId())
+                .owner(user)
+                .budgetType(BudgetType.WEEKLY)
+                .limitAmount(new BigDecimal("500.00"))
+                .active(false)
+                .build();
+
+        doReturn(Optional.of(budgetSaved)).when(repository).findByIdAndOwner(budgetSaved.getId(), user);
+        doAnswer(invocation -> invocation.getArgument(0)).when(repository).save(any());
+
+        Budget result = service.update(budgetUpdate);
+
+        assertEquals(BudgetType.WEEKLY, result.getBudgetType());
+        assertEquals(0, new BigDecimal("500.00").compareTo(result.getLimitAmount()));
+        assertEquals(false, result.getActive());
+        verify(repository, times(1)).findByIdAndOwner(budgetSaved.getId(), user);
+        verify(repository, times(1)).save(budgetSaved);
+    }
+
+    @Test
+    @DisplayName("Should throw NotFoundException when budget does not exist")
+    void update_WhenBudgetDoesNotExist_ShouldThrowNotFoundException() {
+        UUID id = UUID.randomUUID();
+
+        User user = User.builder()
+                .id(UUID.randomUUID())
+                .name("Anderson")
+                .email("anderson@gmail.com")
+                .password("password")
+                .role(UserRole.ROLE_USER)
+                .build();
+
+        Budget budgetUpdate = Budget.builder()
+                .id(id)
+                .owner(user)
+                .budgetType(BudgetType.WEEKLY)
+                .limitAmount(new BigDecimal("500.00"))
+                .active(false)
+                .build();
+
+        doReturn(Optional.empty()).when(repository).findByIdAndOwner(id, user);
+
+        assertThrows(NotFoundException.class, () -> service.update(budgetUpdate));
+
+        verify(repository, times(1)).findByIdAndOwner(id, user);
+        verify(repository, never()).save(any());
     }
 }
