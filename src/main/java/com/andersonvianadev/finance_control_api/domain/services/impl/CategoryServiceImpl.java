@@ -78,4 +78,25 @@ public class CategoryServiceImpl implements ICategoryService {
 
         repository.delete(category);
     }
+
+    @Override
+    public Category update(Category category) {
+        UUID categoryId = category.getId();
+        Category categoryActual = repository.findByIdAndOwner(categoryId, category.getOwner())
+                .orElseThrow(() -> new NotFoundException(String.format("Category with id %s not found", categoryId.toString())));
+
+        if(category.getName() != null && !category.getName().equals(categoryActual.getName())) {
+            categoryActual.setName(category.getName());
+        }
+
+        if(category.getDescription() != null && !category.getDescription().equals(categoryActual.getDescription())) {
+            categoryActual.setDescription(category.getDescription());
+        }
+
+        if(category.getIcon() != null && !category.getIcon().equals(categoryActual.getIcon())) {
+            categoryActual.setIcon(category.getIcon());
+        }
+
+        return repository.save(categoryActual);
+    }
 }

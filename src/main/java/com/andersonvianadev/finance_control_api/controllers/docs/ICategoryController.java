@@ -1,6 +1,7 @@
 package com.andersonvianadev.finance_control_api.controllers.docs;
 
 import com.andersonvianadev.finance_control_api.controllers.dtos.requests.CategoryRequestDTO;
+import com.andersonvianadev.finance_control_api.controllers.dtos.requests.CategoryUpdateDTO;
 import com.andersonvianadev.finance_control_api.controllers.dtos.responses.CategoryResponseDTO;
 import com.andersonvianadev.finance_control_api.domain.models.User;
 import com.andersonvianadev.finance_control_api.infra.exceptions.StandardException;
@@ -303,5 +304,127 @@ public interface ICategoryController {
             @AuthenticationPrincipal(expression = "user") User user,
             @Parameter(description = "UUID of the category to delete.", required = true, example = "3fa85f64-5717-4562-b3fc-2c963f66afa6")
             @PathVariable UUID id
+    );
+
+    @Operation(
+            summary = "Update category",
+            description = """
+                    Updates the name, description and/or icon of an existing category.
+                    Only categories owned by the authenticated user can be updated.
+                    """,
+            security = @SecurityRequirement(name = "bearerAuth"),
+            responses = {
+                    @ApiResponse(
+                            responseCode = "200",
+                            description = "Category updated successfully.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = CategoryResponseDTO.class),
+                                    examples = @ExampleObject(
+                                            name = "Category updated.",
+                                            value = """
+                                                    {
+                                                        "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+                                                        "name": "Fitness",
+                                                        "description": "Gym and sports expenses",
+                                                        "icon": "fitness",
+                                                        "owner": {
+                                                            "id": "9cb12d90-4623-41c2-b3fc-1a963f77bcf1",
+                                                            "name": "Anderson",
+                                                            "email": "anderson@gmail.com"
+                                                        }
+                                                    }
+                                                    """
+                                    )
+                            )
+                    ),
+                    @ApiResponse(
+                            responseCode = "404",
+                            description = "Category not found.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = StandardException.class),
+                                    examples = @ExampleObject(
+                                            name = "Category not found.",
+                                            value = """
+                                                    {
+                                                        "timestamp": "2026-06-06T09:00:00Z",
+                                                        "status": 404,
+                                                        "error": "Category with id 3fa85f64-5717-4562-b3fc-2c963f66afa6 not found",
+                                                        "path": "/nix-finance-api/categories/3fa85f64-5717-4562-b3fc-2c963f66afa6"
+                                                    }
+                                                    """
+                                    )
+                            )
+                    ),
+                    @ApiResponse(
+                            responseCode = "400",
+                            description = "Invalid field value.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = StandardException.class),
+                                    examples = @ExampleObject(
+                                            name = "Name exceeds maximum length.",
+                                            value = """
+                                                    {
+                                                        "timestamp": "2026-06-06T09:00:00Z",
+                                                        "status": 400,
+                                                        "error": "Name field must contain at most 30 characters.",
+                                                        "path": "/nix-finance-api/categories/3fa85f64-5717-4562-b3fc-2c963f66afa6"
+                                                    }
+                                                    """
+                                    )
+                            )
+                    ),
+                    @ApiResponse(
+                            responseCode = "401",
+                            description = "Unauthorized. Missing or invalid JWT token.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = StandardException.class),
+                                    examples = @ExampleObject(
+                                            name = "Missing or invalid token.",
+                                            value = """
+                                                    {
+                                                        "timestamp": "2026-06-06T09:00:00Z",
+                                                        "status": 401,
+                                                        "error": "Unauthorized",
+                                                        "path": "/nix-finance-api/categories/3fa85f64-5717-4562-b3fc-2c963f66afa6"
+                                                    }
+                                                    """
+                                    )
+                            )
+                    )
+            }
+    )
+    ResponseEntity<CategoryResponseDTO> update(
+            @Parameter(hidden = true)
+            @AuthenticationPrincipal(expression = "user") User user,
+            @Parameter(description = "UUID of the category to update.", required = true, example = "3fa85f64-5717-4562-b3fc-2c963f66afa6")
+            @PathVariable UUID id,
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = """
+                            Fields to update. All fields are optional — only the provided ones will be changed.
+                            Validation rules:
+                                - name: optional, max 30 characters
+                                - description: optional, max 50 characters
+                                - icon: optional, max 20 characters
+                            """,
+                    required = true,
+                    content = @Content(
+                            schema = @Schema(implementation = CategoryUpdateDTO.class),
+                            examples = @ExampleObject(
+                                    name = "Valid update.",
+                                    value = """
+                                            {
+                                                "name": "Fitness",
+                                                "description": "Gym and sports expenses",
+                                                "icon": "fitness"
+                                            }
+                                            """
+                            )
+                    )
+            )
+            @RequestBody @Valid CategoryUpdateDTO request
     );
 }

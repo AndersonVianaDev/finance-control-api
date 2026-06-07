@@ -2,6 +2,7 @@ package com.andersonvianadev.finance_control_api.controllers;
 
 import com.andersonvianadev.finance_control_api.controllers.docs.ICategoryController;
 import com.andersonvianadev.finance_control_api.controllers.dtos.requests.CategoryRequestDTO;
+import com.andersonvianadev.finance_control_api.controllers.dtos.requests.CategoryUpdateDTO;
 import com.andersonvianadev.finance_control_api.controllers.dtos.responses.CategoryResponseDTO;
 import com.andersonvianadev.finance_control_api.controllers.mappers.CategoryMapper;
 import com.andersonvianadev.finance_control_api.domain.models.Category;
@@ -12,7 +13,14 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.UUID;
 
@@ -51,5 +59,17 @@ public class CategoryController implements ICategoryController {
         service.delete(id, user);
 
         return ResponseEntity.noContent().build();
+    }
+
+    @Override
+    @PutMapping("/{id}")
+    public ResponseEntity<CategoryResponseDTO> update(@AuthenticationPrincipal(expression = "user") User user,
+                                                      @PathVariable UUID id,
+                                                      @RequestBody @Valid CategoryUpdateDTO request) {
+        Category category = CategoryMapper.toDomain(user, id, request);
+        category = service.update(category);
+
+        CategoryResponseDTO response = CategoryMapper.toResponse(category);
+        return ResponseEntity.ok(response);
     }
 }
