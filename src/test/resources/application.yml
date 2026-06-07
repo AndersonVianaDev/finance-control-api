@@ -32,5 +32,11 @@ app:
     plans:
       free:
         category-limit: 2
+  rate-limit:
+    enabled: false
+    global:
+      requests-per-minute: 5
+    auth:
+      requests-per-minute: 2
 
 spring.threads.virtual.enabled: true
