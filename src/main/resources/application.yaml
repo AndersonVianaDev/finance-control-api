@@ -31,5 +31,11 @@ app:
     plans:
       free:
         category-limit: ${APP_CATEGORY-LIMIT}
+  rate-limit:
+    enabled: ${APP_RATE_LIMIT_ENABLED:true}
+    global:
+      requests-per-minute: ${APP_RATE_LIMIT_GLOBAL_REQUESTS_PER_MINUTE:100}
+    auth:
+      requests-per-minute: ${APP_RATE_LIMIT_AUTH_REQUESTS_PER_MINUTE:5}
 
 spring.threads.virtual.enabled: true
