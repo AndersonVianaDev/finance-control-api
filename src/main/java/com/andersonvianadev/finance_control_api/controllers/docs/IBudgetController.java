@@ -1,0 +1,175 @@
+package com.andersonvianadev.finance_control_api.controllers.docs;
+
+import com.andersonvianadev.finance_control_api.controllers.dtos.requests.BudgetRequestDTO;
+import com.andersonvianadev.finance_control_api.controllers.dtos.responses.BudgetResponseDTO;
+import com.andersonvianadev.finance_control_api.domain.models.User;
+import com.andersonvianadev.finance_control_api.infra.exceptions.StandardException;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.RequestBody;
+
+@Tag(
+        name = "Budgets",
+        description = "Operations for budgets"
+)
+public interface IBudgetController {
+
+    @Operation(
+            summary = "Create budget",
+            description = """
+                    Creates a new spending budget linked to a category for the authenticated user.
+                    Each user can have only one budget per category.
+                    The category must belong to the user or be a global category.
+                    """,
+            security = @SecurityRequirement(name = "bearerAuth"),
+            responses = {
+                    @ApiResponse(
+                            responseCode = "201",
+                            description = "Budget created successfully.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = BudgetResponseDTO.class),
+                                    examples = @ExampleObject(
+                                            name = "Budget created.",
+                                            value = """
+                                                    {
+                                                        "user": {
+                                                            "id": "9cb12d90-4623-41c2-b3fc-1a963f77bcf1",
+                                                            "name": "Anderson",
+                                                            "email": "anderson@gmail.com"
+                                                        },
+                                                        "category": {
+                                                            "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+                                                            "name": "Food",
+                                                            "description": "Grocery and restaurant expenses",
+                                                            "icon": "food",
+                                                            "owner": {
+                                                                "id": "9cb12d90-4623-41c2-b3fc-1a963f77bcf1",
+                                                                "name": "Anderson",
+                                                                "email": "anderson@gmail.com"
+                                                            }
+                                                        },
+                                                        "budgetType": "MONTHLY",
+                                                        "limitAmount": 1500.00,
+                                                        "active": true
+                                                    }
+                                                    """
+                                    )
+                            )
+                    ),
+                    @ApiResponse(
+                            responseCode = "409",
+                            description = "A budget already exists for this category.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = StandardException.class),
+                                    examples = @ExampleObject(
+                                            name = "Budget already exists.",
+                                            value = """
+                                                    {
+                                                        "timestamp": "2026-06-07T09:00:00Z",
+                                                        "status": 409,
+                                                        "error": "A budget for category Food already exists.",
+                                                        "path": "/nix-finance-api/budgets"
+                                                    }
+                                                    """
+                                    )
+                            )
+                    ),
+                    @ApiResponse(
+                            responseCode = "404",
+                            description = "Category not found or not accessible by the user.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = StandardException.class),
+                                    examples = @ExampleObject(
+                                            name = "Category not found.",
+                                            value = """
+                                                    {
+                                                        "timestamp": "2026-06-07T09:00:00Z",
+                                                        "status": 404,
+                                                        "error": "Category not found.",
+                                                        "path": "/nix-finance-api/budgets"
+                                                    }
+                                                    """
+                                    )
+                            )
+                    ),
+                    @ApiResponse(
+                            responseCode = "400",
+                            description = "Invalid field value.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = StandardException.class),
+                                    examples = @ExampleObject(
+                                            name = "Limit must be positive.",
+                                            value = """
+                                                    {
+                                                        "timestamp": "2026-06-07T09:00:00Z",
+                                                        "status": 400,
+                                                        "error": "the limit value must be positive.",
+                                                        "path": "/nix-finance-api/budgets"
+                                                    }
+                                                    """
+                                    )
+                            )
+                    ),
+                    @ApiResponse(
+                            responseCode = "401",
+                            description = "Unauthorized. Missing or invalid JWT token.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = StandardException.class),
+                                    examples = @ExampleObject(
+                                            name = "Missing or invalid token.",
+                                            value = """
+                                                    {
+                                                        "timestamp": "2026-06-07T09:00:00Z",
+                                                        "status": 401,
+                                                        "error": "Unauthorized",
+                                                        "path": "/nix-finance-api/budgets"
+                                                    }
+                                                    """
+                                    )
+                            )
+                    )
+            }
+    )
+    ResponseEntity<BudgetResponseDTO> save(
+            @Parameter(hidden = true)
+            @AuthenticationPrincipal(expression = "user") User user,
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = """
+                            Data required to create the budget.
+                            Validation rules:
+                                - categoryId: required, must be a category owned by the user or global
+                                - budgetType: required (MONTHLY or WEEKLY)
+                                - limitAmount: required, must be a positive value
+                            """,
+                    required = true,
+                    content = @Content(
+                            schema = @Schema(implementation = BudgetRequestDTO.class),
+                            examples = @ExampleObject(
+                                    name = "Valid budget.",
+                                    value = """
+                                            {
+                                                "categoryId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+                                                "budgetType": "MONTHLY",
+                                                "limitAmount": 1500.00
+                                            }
+                                            """
+                            )
+                    )
+            )
+            @RequestBody @Valid BudgetRequestDTO request
+    );
+}
