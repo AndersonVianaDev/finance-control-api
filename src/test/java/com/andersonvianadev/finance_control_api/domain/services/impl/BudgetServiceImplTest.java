@@ -320,4 +320,61 @@ class BudgetServiceImplTest {
         verify(repository, times(1)).findByIdAndOwner(id, user);
         verify(repository, never()).save(any());
     }
+
+    @Test
+    @DisplayName("Should delete budget successfully when budget exists")
+    void delete_WhenBudgetExists_ShouldDeleteBudget() {
+        User user = User.builder()
+                .id(UUID.randomUUID())
+                .name("Anderson")
+                .email("anderson@gmail.com")
+                .password("password")
+                .role(UserRole.ROLE_USER)
+                .build();
+
+        Category category = Category.builder()
+                .id(UUID.randomUUID())
+                .name("food")
+                .description("food description")
+                .icon("food")
+                .owner(user)
+                .build();
+
+        Budget budget = Budget.builder()
+                .id(UUID.randomUUID())
+                .owner(user)
+                .category(category)
+                .budgetType(BudgetType.MONTHLY)
+                .limitAmount(new BigDecimal("1500.00"))
+                .active(true)
+                .build();
+
+        doReturn(Optional.of(budget)).when(repository).findByIdAndOwner(budget.getId(), user);
+
+        service.delete(user, budget.getId());
+
+        verify(repository, times(1)).findByIdAndOwner(budget.getId(), user);
+        verify(repository, times(1)).delete(budget);
+    }
+
+    @Test
+    @DisplayName("Should throw NotFoundException when budget does not exist")
+    void delete_WhenBudgetDoesNotExist_ShouldThrowNotFoundException() {
+        UUID id = UUID.randomUUID();
+
+        User user = User.builder()
+                .id(UUID.randomUUID())
+                .name("Anderson")
+                .email("anderson@gmail.com")
+                .password("password")
+                .role(UserRole.ROLE_USER)
+                .build();
+
+        doReturn(Optional.empty()).when(repository).findByIdAndOwner(id, user);
+
+        assertThrows(NotFoundException.class, () -> service.delete(user, id));
+
+        verify(repository, times(1)).findByIdAndOwner(id, user);
+        verify(repository, never()).delete(any());
+    }
 }
