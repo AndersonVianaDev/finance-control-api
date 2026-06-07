@@ -3,6 +3,8 @@ package com.andersonvianadev.finance_control_api.infra.repositories;
 import com.andersonvianadev.finance_control_api.domain.models.Budget;
 import com.andersonvianadev.finance_control_api.domain.models.Category;
 import com.andersonvianadev.finance_control_api.domain.models.User;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -13,4 +15,5 @@ import java.util.UUID;
 public interface BudgetRepository extends JpaRepository<Budget, UUID> {
     boolean existsByCategoryAndOwner(Category category, User owner);
     Optional<Budget> findByIdAndOwner(UUID id, User owner);
+    Page<Budget> findByOwner(User owner, Pageable pageable);
 }
