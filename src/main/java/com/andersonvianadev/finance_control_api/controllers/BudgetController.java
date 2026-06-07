@@ -2,6 +2,7 @@ package com.andersonvianadev.finance_control_api.controllers;
 
 import com.andersonvianadev.finance_control_api.controllers.docs.IBudgetController;
 import com.andersonvianadev.finance_control_api.controllers.dtos.requests.BudgetRequestDTO;
+import com.andersonvianadev.finance_control_api.controllers.dtos.requests.BudgetUpdateDTO;
 import com.andersonvianadev.finance_control_api.controllers.dtos.responses.BudgetResponseDTO;
 import com.andersonvianadev.finance_control_api.controllers.mappers.BudgetMapper;
 import com.andersonvianadev.finance_control_api.domain.models.Budget;
@@ -41,6 +42,18 @@ public class BudgetController implements IBudgetController {
         Budget budget = service.findById(user, id);
         BudgetResponseDTO response = BudgetMapper.toResponse(budget);
 
+        return ResponseEntity.ok(response);
+    }
+
+    @Override
+    @PutMapping("/{id}")
+    public ResponseEntity<BudgetResponseDTO> update(@AuthenticationPrincipal(expression = "user") User user,
+                                                    @PathVariable UUID id,
+                                                    @RequestBody @Valid BudgetUpdateDTO request) {
+        Budget budget = BudgetMapper.toDomain(id, user, request);
+        budget = service.update(budget);
+
+        BudgetResponseDTO response = BudgetMapper.toResponse(budget);
         return ResponseEntity.ok(response);
     }
 }

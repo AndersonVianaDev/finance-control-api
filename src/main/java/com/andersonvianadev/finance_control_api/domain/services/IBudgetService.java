@@ -8,4 +8,5 @@ import java.util.UUID;
 public interface IBudgetService {
     Budget save(Budget budget);
     Budget findById(User owner, UUID id);
+    Budget update(Budget budget);
 }
