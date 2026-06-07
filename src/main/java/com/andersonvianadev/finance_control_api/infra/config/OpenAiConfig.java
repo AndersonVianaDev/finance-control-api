@@ -25,7 +25,13 @@ public class OpenAiConfig {
                                    - Investment registration
                                    - Financial report
                                    - AI support
-                                   
+
+                                   Rate limiting:
+                                   - Global limit per IP for all endpoints
+                                   - Stricter limit per IP for authentication endpoints (login and registration)
+                                   - Responses include headers: X-Rate-Limit-Limit, X-Rate-Limit-Remaining, X-Rate-Limit-Reset
+                                   - When the limit is exceeded, the API returns HTTP 429 Too Many Requests
+
                                    Project developed in Java 21 with Spring Boot
                                 """
                         ).contact(new Contact()
