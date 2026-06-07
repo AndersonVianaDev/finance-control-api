@@ -4,12 +4,16 @@ import com.andersonvianadev.finance_control_api.controllers.docs.ICategoryContro
 import com.andersonvianadev.finance_control_api.controllers.dtos.requests.CategoryRequestDTO;
 import com.andersonvianadev.finance_control_api.controllers.dtos.requests.CategoryUpdateDTO;
 import com.andersonvianadev.finance_control_api.controllers.dtos.responses.CategoryResponseDTO;
+import com.andersonvianadev.finance_control_api.controllers.dtos.responses.PageResponseDTO;
 import com.andersonvianadev.finance_control_api.controllers.mappers.CategoryMapper;
 import com.andersonvianadev.finance_control_api.domain.models.Category;
 import com.andersonvianadev.finance_control_api.domain.models.User;
 import com.andersonvianadev.finance_control_api.domain.services.ICategoryService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -71,5 +75,13 @@ public class CategoryController implements ICategoryController {
 
         CategoryResponseDTO response = CategoryMapper.toResponse(category);
         return ResponseEntity.ok(response);
+    }
+
+    @Override
+    @GetMapping
+    public ResponseEntity<PageResponseDTO<CategoryResponseDTO>> findAll(@AuthenticationPrincipal(expression = "user") User user,
+                                                                @PageableDefault(size = 10) Pageable pageable) {
+        Page<CategoryResponseDTO> response = service.findAll(user, pageable).map(CategoryMapper::toResponse);
+        return ResponseEntity.ok(PageResponseDTO.of(response));
     }
 }

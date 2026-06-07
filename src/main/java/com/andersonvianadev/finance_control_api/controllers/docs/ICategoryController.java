@@ -3,6 +3,7 @@ package com.andersonvianadev.finance_control_api.controllers.docs;
 import com.andersonvianadev.finance_control_api.controllers.dtos.requests.CategoryRequestDTO;
 import com.andersonvianadev.finance_control_api.controllers.dtos.requests.CategoryUpdateDTO;
 import com.andersonvianadev.finance_control_api.controllers.dtos.responses.CategoryResponseDTO;
+import com.andersonvianadev.finance_control_api.controllers.dtos.responses.PageResponseDTO;
 import com.andersonvianadev.finance_control_api.domain.models.User;
 import com.andersonvianadev.finance_control_api.infra.exceptions.StandardException;
 import io.swagger.v3.oas.annotations.Operation;
@@ -14,6 +15,8 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -426,5 +429,77 @@ public interface ICategoryController {
                     )
             )
             @RequestBody @Valid CategoryUpdateDTO request
+    );
+
+    @Operation(
+            summary = "List categories",
+            description = """
+                    Returns a paginated list of categories belonging to the authenticated user
+                    and global categories (without owner).
+                    Pagination query parameters:
+                        - page: page number (0-indexed, default: 0)
+                        - size: page size (default: 10)
+                        - sort: sorting criteria (e.g. sort=name,asc)
+                    """,
+            security = @SecurityRequirement(name = "bearerAuth"),
+            responses = {
+                    @ApiResponse(
+                            responseCode = "200",
+                            description = "Categories retrieved successfully.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = PageResponseDTO.class),
+                                    examples = @ExampleObject(
+                                            name = "Categories page.",
+                                            value = """
+                                                    {
+                                                        "content": [
+                                                            {
+                                                                "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+                                                                "name": "Food",
+                                                                "description": "Grocery and restaurant expenses",
+                                                                "icon": "food",
+                                                                "owner": {
+                                                                    "id": "9cb12d90-4623-41c2-b3fc-1a963f77bcf1",
+                                                                    "name": "Anderson",
+                                                                    "email": "anderson@gmail.com"
+                                                                }
+                                                            }
+                                                        ],
+                                                        "page": 0,
+                                                        "size": 10,
+                                                        "totalElement": 1,
+                                                        "totalPages": 1,
+                                                        "last": true
+                                                    }
+                                                    """
+                                    )
+                            )
+                    ),
+                    @ApiResponse(
+                            responseCode = "401",
+                            description = "Unauthorized. Missing or invalid JWT token.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = StandardException.class),
+                                    examples = @ExampleObject(
+                                            name = "Missing or invalid token.",
+                                            value = """
+                                                    {
+                                                        "timestamp": "2026-06-06T09:00:00Z",
+                                                        "status": 401,
+                                                        "error": "Unauthorized",
+                                                        "path": "/nix-finance-api/categories"
+                                                    }
+                                                    """
+                                    )
+                            )
+                    )
+            }
+    )
+    ResponseEntity<PageResponseDTO<CategoryResponseDTO>> findAll(
+            @Parameter(hidden = true)
+            @AuthenticationPrincipal(expression = "user") User user,
+            @PageableDefault(size = 10) Pageable pageable
     );
 }

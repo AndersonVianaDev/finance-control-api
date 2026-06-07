@@ -15,8 +15,13 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -325,5 +330,59 @@ class CategoryServiceImplTest {
 
         verify(repository, times(1)).findByIdAndOwner(id, user);
         verify(repository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Should return paginated categories when categories exist")
+    void findAll_WhenCategoriesExist_ShouldReturnPageOfCategories() {
+        User user = User.builder()
+                .id(UUID.randomUUID())
+                .name("anderson")
+                .email("anderson@gmail.com")
+                .password("Arthur@1406")
+                .role(UserRole.ROLE_USER)
+                .build();
+
+        Category category = Category.builder()
+                .id(UUID.randomUUID())
+                .name("food")
+                .description("food description")
+                .icon("food")
+                .owner(user)
+                .build();
+
+        Pageable pageable = PageRequest.of(0, 10);
+        Page<Category> page = new PageImpl<>(List.of(category), pageable, 1);
+
+        doReturn(page).when(repository).findByOwnerOrOwnerIsNull(user, pageable);
+
+        Page<Category> result = service.findAll(user, pageable);
+
+        assertEquals(1, result.getTotalElements());
+        assertEquals(category, result.getContent().getFirst());
+        verify(repository, times(1)).findByOwnerOrOwnerIsNull(user, pageable);
+    }
+
+    @Test
+    @DisplayName("Should return empty page when no categories exist")
+    void findAll_WhenNoCategoriesExist_ShouldReturnEmptyPage() {
+        User user = User.builder()
+                .id(UUID.randomUUID())
+                .name("anderson")
+                .email("anderson@gmail.com")
+                .password("Arthur@1406")
+                .role(UserRole.ROLE_USER)
+                .build();
+
+        Pageable pageable = PageRequest.of(0, 10);
+        Page<Category> page = new PageImpl<>(List.of(), pageable, 0);
+
+        doReturn(page).when(repository).findByOwnerOrOwnerIsNull(user, pageable);
+
+        Page<Category> result = service.findAll(user, pageable);
+
+        assertEquals(0, result.getTotalElements());
+        assertEquals(0, result.getContent().size());
+        verify(repository, times(1)).findByOwnerOrOwnerIsNull(user, pageable);
     }
 }

@@ -2,6 +2,8 @@ package com.andersonvianadev.finance_control_api.infra.repositories;
 
 import com.andersonvianadev.finance_control_api.domain.models.Category;
 import com.andersonvianadev.finance_control_api.domain.models.User;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -30,4 +32,6 @@ public interface CategoryRepository extends JpaRepository<Category, UUID> {
     Optional<Category> findByIdAndOwnerOrOwnerIsNull(@Param("id") UUID id, @Param("owner") User owner);
 
     Optional<Category> findByIdAndOwner(UUID id, User owner);
+
+    Page<Category> findByOwnerOrOwnerIsNull(User owner, Pageable pageable);
 }
