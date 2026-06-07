@@ -1,8 +1,10 @@
 package com.andersonvianadev.finance_control_api.domain.services.impl;
 
 import com.andersonvianadev.finance_control_api.domain.models.User;
+import com.andersonvianadev.finance_control_api.domain.models.enums.UserRole;
 import com.andersonvianadev.finance_control_api.domain.services.IPasswordEncoderService;
 import com.andersonvianadev.finance_control_api.domain.services.IUserService;
+import com.andersonvianadev.finance_control_api.infra.exceptions.AccessDeniedException;
 import com.andersonvianadev.finance_control_api.infra.exceptions.NotFoundException;
 import com.andersonvianadev.finance_control_api.infra.exceptions.ResourceAlreadyExistsException;
 import com.andersonvianadev.finance_control_api.infra.repositories.UserRepository;
@@ -54,10 +56,14 @@ public class UserServiceImpl implements IUserService {
     }
 
     @Override
-    public void deleteById(UUID id) {
-        User user = this.findById(id);
+    public void deleteById(User user, UUID id) {
+        if(!UserRole.ROLE_ADMIN.equals(user.getRole())) {
+            throw new AccessDeniedException("You do not have permission to execute this action.");
+        }
 
-        repository.delete(user);
+        User userToBeDeleted = this.findById(id);
+
+        repository.delete(userToBeDeleted);
     }
 
     @Override

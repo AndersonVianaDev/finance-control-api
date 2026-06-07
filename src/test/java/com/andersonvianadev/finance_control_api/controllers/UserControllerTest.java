@@ -9,6 +9,7 @@ import com.andersonvianadev.finance_control_api.domain.services.IUserService;
 import com.andersonvianadev.finance_control_api.infra.exceptions.StandardException;
 import com.andersonvianadev.finance_control_api.infra.repositories.CategoryRepository;
 import com.andersonvianadev.finance_control_api.infra.repositories.UserRepository;
+import com.andersonvianadev.finance_control_api.infra.security.UserPrincipal;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -25,9 +26,10 @@ import tools.jackson.databind.ObjectMapper;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 
 @SpringBootTest
-@AutoConfigureMockMvc(addFilters = false)
+@AutoConfigureMockMvc
 class UserControllerTest {
 
     @Autowired
@@ -125,18 +127,22 @@ class UserControllerTest {
     }
 
     @Test
-    @DisplayName("Should return user when a valid ID is provided")
-    void findById_WhenUserExists_ShouldReturnUser() throws Exception {
-        User user = User.builder()
-                .name("Anderson")
-                .email("anderson@gmail.com")
-                .password("Anderson@12")
-                .build();
+    @DisplayName("Should return authenticated user profile when user is logged in")
+    void findById_WhenUserIsAuthenticated_ShouldReturnUserProfile() throws Exception {
+        User userSaved = userService.save(
+                User.builder()
+                        .name("Anderson")
+                        .email("anderson@gmail.com")
+                        .password("Anderson@12")
+                        .role(UserRole.ROLE_USER)
+                        .build()
+        );
 
-        user = repository.save(user);
+        UserPrincipal userPrincipal = new UserPrincipal(userSaved);
 
-        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.get("/users/" + user.getId().toString())
-                .contentType(MediaType.APPLICATION_JSON))
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.get("/users")
+                        .with(user(userPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(MockMvcResultMatchers.status().isOk())
                 .andDo(MockMvcResultHandlers.print())
                 .andReturn();
@@ -145,55 +151,61 @@ class UserControllerTest {
 
         UserResponseDTO response = objectMapper.readValue(content, UserResponseDTO.class);
 
-        assertEquals(user.getId(), response.id());
-        assertEquals(user.getName(), response.name());
-        assertEquals(user.getEmail(), response.email());
+        assertEquals(userSaved.getId(), response.id());
+        assertEquals(userSaved.getName(), response.name());
+        assertEquals(userSaved.getEmail(), response.email());
     }
 
     @Test
-    @DisplayName("Should throw NotFoundException when user does not exist")
-    void findById_WhenUserDoesNotExist_ShouldThrowNotFoundException() throws Exception{
-        UUID id = UUID.randomUUID();
+    @DisplayName("Should delete user successfully when admin deletes an existing user")
+    void deleteById_WhenAdminAndUserExists_ShouldDeleteUser() throws Exception {
+        User admin = userService.save(
+                User.builder()
+                        .name("Admin")
+                        .email("admin@gmail.com")
+                        .password("Admin@1234")
+                        .role(UserRole.ROLE_ADMIN)
+                        .build()
+        );
 
-        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.get("/users/" + id.toString())
-                .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(MockMvcResultMatchers.status().isNotFound())
-                .andDo(MockMvcResultHandlers.print())
-                .andReturn();
+        User userToDelete = userService.save(
+                User.builder()
+                        .name("Anderson")
+                        .email("anderson@gmail.com")
+                        .password("Anderson@12")
+                        .role(UserRole.ROLE_USER)
+                        .build()
+        );
 
-        String content = result.getResponse().getContentAsString();
+        UserPrincipal adminPrincipal = new UserPrincipal(admin);
 
-        StandardException exception = objectMapper.readValue(content, StandardException.class);
-
-        assertEquals(HttpStatus.NOT_FOUND.value(), exception.status());
-    }
-
-    @Test
-    @DisplayName("Should delete user successfully when user exists")
-    void deleteById_WhenUserExists_ShouldDeleteUser() throws Exception {
-        User user = User.builder()
-                .name("Anderson")
-                .email("anderson@gmail.com")
-                .password("Anderson@12")
-                .build();
-
-        user = repository.save(user);
-
-        mockMvc.perform(MockMvcRequestBuilders.delete("/users/" + user.getId().toString())
-                .contentType(MediaType.APPLICATION_JSON))
+        mockMvc.perform(MockMvcRequestBuilders.delete("/users/" + userToDelete.getId())
+                        .with(user(adminPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(MockMvcResultMatchers.status().isNoContent())
                 .andDo(MockMvcResultHandlers.print())
                 .andReturn();
 
-        assertTrue(repository.findById(user.getId()).isEmpty());
+        assertTrue(repository.findById(userToDelete.getId()).isEmpty());
     }
 
     @Test
     @DisplayName("Should throw NotFoundException when user does not exist")
     void deleteById_WhenUserDoesNotExist_ShouldThrowNotFoundException() throws Exception {
+        User admin = userService.save(
+                User.builder()
+                        .name("Admin")
+                        .email("admin@gmail.com")
+                        .password("Admin@1234")
+                        .role(UserRole.ROLE_ADMIN)
+                        .build()
+        );
+
+        UserPrincipal adminPrincipal = new UserPrincipal(admin);
         UUID id = UUID.randomUUID();
 
-        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.delete("/users/" + id.toString())
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.delete("/users/" + id)
+                        .with(user(adminPrincipal))
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(MockMvcResultMatchers.status().isNotFound())
                 .andDo(MockMvcResultHandlers.print())
@@ -207,23 +219,60 @@ class UserControllerTest {
     }
 
     @Test
-    @DisplayName("Should update user successfully when user exists")
-    void update_WhenUserExists_ShouldUpdateUser() throws Exception {
-        User userSaved = User.builder()
-                .name("Anderson")
-                .email("anderson@gmail.com")
-                .password("anderson@12")
-                .build();
+    @DisplayName("Should throw AccessDeniedException when user is not admin")
+    void deleteById_WhenUserIsNotAdmin_ShouldThrowAccessDeniedException() throws Exception {
+        User userSaved = userService.save(
+                User.builder()
+                        .name("Anderson")
+                        .email("anderson@gmail.com")
+                        .password("Anderson@12")
+                        .role(UserRole.ROLE_USER)
+                        .build()
+        );
 
-        userSaved = repository.save(userSaved);
+        User userToDelete = userService.save(
+                User.builder()
+                        .name("Other")
+                        .email("other@gmail.com")
+                        .password("Other@1234")
+                        .role(UserRole.ROLE_USER)
+                        .build()
+        );
+
+        UserPrincipal userPrincipal = new UserPrincipal(userSaved);
+
+        mockMvc.perform(MockMvcRequestBuilders.delete("/users/" + userToDelete.getId())
+                        .with(user(userPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(MockMvcResultMatchers.status().isForbidden())
+                .andDo(MockMvcResultHandlers.print())
+                .andReturn();
+
+        assertTrue(repository.findById(userToDelete.getId()).isPresent());
+    }
+
+    @Test
+    @DisplayName("Should update authenticated user successfully when user exists")
+    void update_WhenUserExists_ShouldUpdateUser() throws Exception {
+        User userSaved = userService.save(
+                User.builder()
+                        .name("Anderson")
+                        .email("anderson@gmail.com")
+                        .password("anderson@12")
+                        .role(UserRole.ROLE_USER)
+                        .build()
+        );
+
+        UserPrincipal userPrincipal = new UserPrincipal(userSaved);
 
         UserUpdateDTO update = new UserUpdateDTO("Anderson12", "anderson12@gmail.com");
 
         String updateJson = objectMapper.writeValueAsString(update);
 
-        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.put("/users/" + userSaved.getId().toString())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(updateJson))
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.put("/users")
+                        .with(user(userPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(updateJson))
                 .andExpect(MockMvcResultMatchers.status().isOk())
                 .andDo(MockMvcResultHandlers.print())
                 .andReturn();
@@ -238,52 +287,34 @@ class UserControllerTest {
     }
 
     @Test
-    @DisplayName("Should throw NotFoundException when user does not exist")
-    void update_WhenUserDoesNotExist_ShouldThrowNotFoundException() throws Exception {
-        UUID id = UUID.randomUUID();
-
-        UserUpdateDTO update = new UserUpdateDTO("Anderson", "anderson@gmail.com");
-
-        String updateJson = objectMapper.writeValueAsString(update);
-
-        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.put("/users/" + id.toString())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(updateJson))
-                .andExpect(MockMvcResultMatchers.status().isNotFound())
-                .andDo(MockMvcResultHandlers.print())
-                .andReturn();
-
-        String content = result.getResponse().getContentAsString();
-
-        StandardException exception = objectMapper.readValue(content, StandardException.class);
-
-        assertEquals(HttpStatus.NOT_FOUND.value(), exception.status());
-    }
-
-    @Test
     @DisplayName("Should throw ResourceAlreadyExistsException when email already exists")
-    void update_ShouldThrowResourceAlreadyExistsException_WhenEmailAlreadyExists()  throws Exception {
-        User userSaved = User.builder()
-                .name("Anderson")
-                .email("anderson@gmail.com")
-                .password("anderson@12")
-                .build();
+    void update_ShouldThrowResourceAlreadyExistsException_WhenEmailAlreadyExists() throws Exception {
+        User userSaved = userService.save(
+                User.builder()
+                        .name("Anderson")
+                        .email("anderson@gmail.com")
+                        .password("anderson@12")
+                        .role(UserRole.ROLE_USER)
+                        .build()
+        );
 
-        userSaved = repository.save(userSaved);
+        userService.save(
+                User.builder()
+                        .name("anderson12")
+                        .email("anderson12@gmail.com")
+                        .password("anderson@12")
+                        .role(UserRole.ROLE_USER)
+                        .build()
+        );
 
-        User userEmailExists = User.builder()
-                .name("anderson12")
-                .email("anderson12@gmail.com")
-                .password("anderson@12")
-                .build();
-
-        userService.save(userEmailExists);
+        UserPrincipal userPrincipal = new UserPrincipal(userSaved);
 
         UserUpdateDTO update = new UserUpdateDTO("Anderson12", "anderson12@gmail.com");
 
         String updateJson = objectMapper.writeValueAsString(update);
 
-        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.put("/users/" + userSaved.getId().toString())
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.put("/users")
+                        .with(user(userPrincipal))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(updateJson))
                 .andExpect(MockMvcResultMatchers.status().isConflict())

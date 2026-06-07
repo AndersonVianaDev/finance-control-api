@@ -10,7 +10,7 @@ public interface IUserService {
 
     User findById(UUID id);
 
-    void deleteById(UUID id);
+    void deleteById(User user, UUID id);
 
     User update(User user);
 }
