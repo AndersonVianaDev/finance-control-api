@@ -39,3 +39,13 @@ app:
       requests-per-minute: ${APP_RATE_LIMIT_AUTH_REQUESTS_PER_MINUTE:5}
 
 spring.threads.virtual.enabled: true
+
+aws:
+  enabled: true
+  region: us-east-1
+  access-key: ${AWS_ACCESS_KEY}
+  secret-key: ${AWS_SECRET_KEY}
+  endpoint-override: ${AWS_ENDPOINT}
+  sqs:
+    queues:
+      installment-generation: ${AWS_QUEUE_INSTALLMENT_GENERATION}

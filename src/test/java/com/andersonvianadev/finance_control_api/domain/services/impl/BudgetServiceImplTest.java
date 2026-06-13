@@ -9,6 +9,7 @@ import com.andersonvianadev.finance_control_api.domain.services.ICategoryService
 import com.andersonvianadev.finance_control_api.infra.exceptions.NotFoundException;
 import com.andersonvianadev.finance_control_api.infra.exceptions.ResourceAlreadyExistsException;
 import com.andersonvianadev.finance_control_api.infra.repositories.BudgetRepository;
+import com.andersonvianadev.finance_control_api.infra.repositories.ExpenseRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -44,6 +45,9 @@ class BudgetServiceImplTest {
 
     @Mock
     private ICategoryService categoryService;
+
+    @Mock
+    private ExpenseRepository expenseRepository;
 
     @InjectMocks
     private BudgetServiceImpl service;
