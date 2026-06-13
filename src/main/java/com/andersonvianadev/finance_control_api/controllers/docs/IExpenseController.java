@@ -32,6 +32,7 @@ public interface IExpenseController {
                     The category must belong to the user or be a global category.
                     Duplicate expenses (same owner, category, date, price and description) are rejected.
                     Budget validation is applied by default; send X-SKIP-BUDGET: true to bypass it.
+                    For installment expenses, the transaction date is automatically adjusted to the next banking working day if it falls on a non-working day.
                     """,
             security = @SecurityRequirement(name = "bearerAuth"),
             responses = {
@@ -137,6 +138,25 @@ public interface IExpenseController {
                                                         "timestamp": "2026-06-07T09:00:00Z",
                                                         "status": 401,
                                                         "error": "Unauthorized",
+                                                        "path": "/nix-finance-api/expenses"
+                                                    }
+                                                    """
+                                    )
+                            )
+                    ),
+                    @ApiResponse(
+                            responseCode = "502",
+                            description = "Calendar API unavailable. Applies only to installment expenses when the banking working day check cannot be performed.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = StandardException.class),
+                                    examples = @ExampleObject(
+                                            name = "Calendar API unavailable.",
+                                            value = """
+                                                    {
+                                                        "timestamp": "2026-06-07T09:00:00Z",
+                                                        "status": 502,
+                                                        "error": "External service unavailable: calendar-api",
                                                         "path": "/nix-finance-api/expenses"
                                                     }
                                                     """

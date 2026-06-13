@@ -34,7 +34,9 @@ public interface IInstallmentPlanController {
                     has been published to the installment-generation queue for background processing.
 
                     Each installment is registered as a separate expense with a monthly interval
-                    starting from firstDueDate.
+                    starting from firstDueDate. For each installment, the transaction date is automatically
+                    adjusted to the next banking working day if it falls on a non-working day.
+                    This check requires the Calendar API; if it is unavailable, a 502 is returned.
                     """,
             security = @SecurityRequirement(name = "bearerAuth"),
             responses = {
@@ -142,6 +144,25 @@ public interface IInstallmentPlanController {
                                                         "timestamp": "2026-06-07T09:00:00Z",
                                                         "status": 401,
                                                         "error": "Unauthorized",
+                                                        "path": "/nix-finance-api/installment-plans"
+                                                    }
+                                                    """
+                                    )
+                            )
+                    ),
+                    @ApiResponse(
+                            responseCode = "502",
+                            description = "Calendar API unavailable. The banking working day check for the first installment could not be performed.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = StandardException.class),
+                                    examples = @ExampleObject(
+                                            name = "Calendar API unavailable.",
+                                            value = """
+                                                    {
+                                                        "timestamp": "2026-06-07T09:00:00Z",
+                                                        "status": 502,
+                                                        "error": "External service unavailable: calendar-api",
                                                         "path": "/nix-finance-api/installment-plans"
                                                     }
                                                     """

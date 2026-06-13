@@ -3,7 +3,9 @@ package com.andersonvianadev.finance_control_api.domain.services.impl;
 import com.andersonvianadev.finance_control_api.domain.models.Category;
 import com.andersonvianadev.finance_control_api.domain.models.Expense;
 import com.andersonvianadev.finance_control_api.domain.models.User;
+import com.andersonvianadev.finance_control_api.domain.models.dtos.CalendarDTO;
 import com.andersonvianadev.finance_control_api.domain.services.IBudgetService;
+import com.andersonvianadev.finance_control_api.domain.services.ICalendarService;
 import com.andersonvianadev.finance_control_api.domain.services.ICategoryService;
 import com.andersonvianadev.finance_control_api.domain.services.IExpenseService;
 import com.andersonvianadev.finance_control_api.infra.exceptions.ResourceAlreadyExistsException;
@@ -13,6 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Slf4j
@@ -23,6 +26,7 @@ public class ExpenseServiceImpl implements IExpenseService {
     private final ExpenseRepository repository;
     private final ICategoryService categoryService;
     private final IBudgetService budgetService;
+    private final ICalendarService calendarService;
 
     @Override
     public Expense save(Expense expense, boolean skipBudget) {
@@ -35,6 +39,16 @@ public class ExpenseServiceImpl implements IExpenseService {
         expense.setCategory(category);
 
         boolean isInstallment = expense.getInstallmentPlan() != null;
+
+        if(isInstallment) {
+            LocalDateTime transactionDate = expense.getTransactionDate();
+            CalendarDTO calendarDTO = calendarService.getDate(transactionDate.toLocalDate());
+
+            if(!calendarDTO.isWorkingDay()) {
+                transactionDate = calendarDTO.nextWorkingDay().atStartOfDay();
+                expense.setTransactionDate(transactionDate);
+            }
+        }
 
         boolean exists = !isInstallment && repository.existsDuplicate(
                 owner.getId(),
