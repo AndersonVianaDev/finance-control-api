@@ -4,9 +4,11 @@ import com.andersonvianadev.finance_control_api.controllers.dtos.requests.Instal
 import com.andersonvianadev.finance_control_api.controllers.dtos.responses.InstallmentPlanResponseDTO;
 import com.andersonvianadev.finance_control_api.domain.models.Category;
 import com.andersonvianadev.finance_control_api.domain.models.User;
+import com.andersonvianadev.finance_control_api.domain.models.dtos.CalendarDTO;
 import com.andersonvianadev.finance_control_api.domain.models.dtos.InstallmentGenerationMessage;
 import com.andersonvianadev.finance_control_api.domain.models.enums.InstallmentStatus;
 import com.andersonvianadev.finance_control_api.domain.models.enums.UserRole;
+import com.andersonvianadev.finance_control_api.domain.services.ICalendarService;
 import com.andersonvianadev.finance_control_api.domain.services.IUserService;
 import com.andersonvianadev.finance_control_api.infra.exceptions.StandardException;
 import com.andersonvianadev.finance_control_api.infra.messaging.ISqsMessageSender;
@@ -23,6 +25,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
@@ -37,10 +40,14 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 
 @SpringBootTest
@@ -63,6 +70,9 @@ class InstallmentPlanControllerTest {
             };
         }
     }
+
+    @MockitoBean
+    private ICalendarService calendarService;
 
     @Autowired
     private MockMvc mockMvc;
@@ -91,6 +101,9 @@ class InstallmentPlanControllerTest {
         installmentPlanRepository.deleteAll();
         categoryRepository.deleteAll();
         userRepository.deleteAll();
+
+        lenient().when(calendarService.getDate(any(LocalDate.class)))
+                .thenAnswer(inv -> new CalendarDTO(inv.getArgument(0), true, null, null));
     }
 
     @Test
@@ -231,6 +244,63 @@ class InstallmentPlanControllerTest {
         StandardException exception = objectMapper.readValue(content, StandardException.class);
 
         assertEquals(HttpStatus.BAD_REQUEST.value(), exception.status());
+    }
+
+    @Test
+    @DisplayName("Should adjust first installment date when firstDueDate falls on a non-working day")
+    void create_WhenFirstDueDateIsNonWorkingDay_ShouldAdjustTransactionDateToNextWorkingDay() throws Exception {
+        User userSaved = userService.save(
+                User.builder()
+                        .name("Anderson")
+                        .email("anderson@gmail.com")
+                        .password("Arthur@1406")
+                        .role(UserRole.ROLE_USER)
+                        .build()
+        );
+
+        Category categorySaved = categoryRepository.save(
+                Category.builder()
+                        .name("Technology")
+                        .description("Electronics and gadgets")
+                        .icon("tech")
+                        .owner(userSaved)
+                        .build()
+        );
+
+        UserPrincipal userPrincipal = new UserPrincipal(userSaved);
+
+        LocalDate nonWorkingDay = LocalDate.of(2026, 6, 28); // Sunday
+        LocalDate nextWorkingDay = LocalDate.of(2026, 6, 30); // Tuesday
+
+        when(calendarService.getDate(nonWorkingDay))
+                .thenReturn(new CalendarDTO(nonWorkingDay, false, "Domingo", nextWorkingDay));
+
+        InstallmentPlanRequestDTO request = new InstallmentPlanRequestDTO(
+                new BigDecimal("18000.00"),
+                12,
+                nonWorkingDay,
+                "MacBook Pro 14",
+                categorySaved.getId()
+        );
+
+        String requestJson = objectMapper.writeValueAsString(request);
+
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.post("/installment-plans")
+                        .with(user(userPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestJson))
+                .andExpect(MockMvcResultMatchers.status().isAccepted())
+                .andDo(MockMvcResultHandlers.print())
+                .andReturn();
+
+        String content = result.getResponse().getContentAsString();
+        InstallmentPlanResponseDTO response = objectMapper.readValue(content, InstallmentPlanResponseDTO.class);
+
+        assertNotNull(response.firstExpense());
+        assertEquals(LocalDateTime.of(2026, 6, 30, 0, 0), response.firstExpense().transactionDate());
+        assertEquals(1, response.firstExpense().installmentNumber());
+        assertEquals(12, response.firstExpense().totalInstallments());
+        assertEquals(12, expenseRepository.count());
     }
 
     @Test

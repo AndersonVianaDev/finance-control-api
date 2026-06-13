@@ -10,6 +10,7 @@ import com.andersonvianadev.finance_control_api.domain.models.enums.InstallmentS
 import com.andersonvianadev.finance_control_api.domain.models.enums.UserRole;
 import com.andersonvianadev.finance_control_api.domain.services.ICategoryService;
 import com.andersonvianadev.finance_control_api.domain.services.IExpenseService;
+import com.andersonvianadev.finance_control_api.infra.exceptions.ExternalServiceException;
 import com.andersonvianadev.finance_control_api.infra.exceptions.NotFoundException;
 import com.andersonvianadev.finance_control_api.infra.messaging.ISqsMessageSender;
 import com.andersonvianadev.finance_control_api.infra.repositories.InstallmentPlanRepository;
@@ -228,6 +229,58 @@ class InstallmentPlanServiceImplTest {
         verify(sqsMessageSender, times(1)).send(anyString(), any(InstallmentGenerationMessage.class));
     }
 
+    @Test
+    @DisplayName("Should throw ExternalServiceException when calendar API is unavailable during first installment creation")
+    void create_WhenCalendarApiIsUnavailableOnFirstInstallment_ShouldThrowExternalServiceException() {
+        User user = User.builder()
+                .id(UUID.randomUUID())
+                .name("Anderson")
+                .email("anderson@gmail.com")
+                .password("password")
+                .role(UserRole.ROLE_USER)
+                .build();
+
+        Category category = Category.builder()
+                .id(UUID.randomUUID())
+                .name("technology")
+                .description("Electronics")
+                .icon("tech")
+                .owner(user)
+                .build();
+
+        InstallmentPlan planRequest = InstallmentPlan.builder()
+                .owner(user)
+                .category(Category.builder().id(category.getId()).build())
+                .description("MacBook Pro 14")
+                .totalAmount(new BigDecimal("18000.00"))
+                .installmentAmount(new BigDecimal("1500.00"))
+                .totalInstallments(12)
+                .firstDueDate(LocalDate.of(2026, 7, 1))
+                .build();
+
+        InstallmentPlan savedPlan = InstallmentPlan.builder()
+                .id(UUID.randomUUID())
+                .owner(user)
+                .category(category)
+                .description("MacBook Pro 14")
+                .totalAmount(new BigDecimal("18000.00"))
+                .installmentAmount(new BigDecimal("1500.00"))
+                .totalInstallments(12)
+                .paidInstallments(0)
+                .status(InstallmentStatus.ACTIVE)
+                .firstDueDate(LocalDate.of(2026, 7, 1))
+                .build();
+
+        doReturn(category).when(categoryService).findByIdAndOwnerOrOwnerIsNull(category.getId(), user);
+        doReturn(savedPlan).when(repository).save(any());
+        doThrow(new ExternalServiceException("calendar-api", new RuntimeException("connection refused")))
+                .when(expenseService).save(any(), any(Boolean.class));
+
+        assertThrows(ExternalServiceException.class, () -> service.create(planRequest, false));
+
+        verify(sqsMessageSender, never()).send(anyString(), any());
+    }
+
     // --- generateRemainingInstallments() ---
 
     @Test
@@ -281,6 +334,46 @@ class InstallmentPlanServiceImplTest {
                 () -> service.generateRemainingInstallments(planId, false));
 
         verify(expenseService, never()).save(any(), any(Boolean.class));
+    }
+
+    @Test
+    @DisplayName("Should throw ExternalServiceException when calendar API is unavailable during remaining installments generation")
+    void generateRemainingInstallments_WhenCalendarApiIsUnavailable_ShouldThrowExternalServiceException() {
+        User user = User.builder()
+                .id(UUID.randomUUID())
+                .name("Anderson")
+                .email("anderson@gmail.com")
+                .password("password")
+                .role(UserRole.ROLE_USER)
+                .build();
+
+        Category category = Category.builder()
+                .id(UUID.randomUUID())
+                .name("technology")
+                .description("Electronics")
+                .icon("tech")
+                .owner(user)
+                .build();
+
+        UUID planId = UUID.randomUUID();
+
+        InstallmentPlan plan = InstallmentPlan.builder()
+                .id(planId)
+                .owner(user)
+                .category(category)
+                .description("MacBook Pro 14")
+                .totalAmount(new BigDecimal("18000.00"))
+                .installmentAmount(new BigDecimal("1500.00"))
+                .totalInstallments(12)
+                .firstDueDate(LocalDate.of(2026, 7, 1))
+                .build();
+
+        doReturn(Optional.of(plan)).when(repository).findById(planId);
+        doThrow(new ExternalServiceException("calendar-api", new RuntimeException("connection refused")))
+                .when(expenseService).save(any(), any(Boolean.class));
+
+        assertThrows(ExternalServiceException.class,
+                () -> service.generateRemainingInstallments(planId, false));
     }
 
     @Test

@@ -9,6 +9,7 @@ import com.andersonvianadev.finance_control_api.domain.models.dtos.InstallmentGe
 import com.andersonvianadev.finance_control_api.domain.services.ICategoryService;
 import com.andersonvianadev.finance_control_api.domain.services.IExpenseService;
 import com.andersonvianadev.finance_control_api.domain.services.IInstallmentPlanService;
+import com.andersonvianadev.finance_control_api.infra.exceptions.ExternalServiceException;
 import com.andersonvianadev.finance_control_api.infra.exceptions.NotFoundException;
 import com.andersonvianadev.finance_control_api.infra.messaging.ISqsMessageSender;
 import com.andersonvianadev.finance_control_api.infra.repositories.InstallmentPlanRepository;
@@ -58,7 +59,7 @@ public class InstallmentPlanServiceImpl implements IInstallmentPlanService {
         sqsMessageSender.send(installmentGenerationQueueUrl,
                 new InstallmentGenerationMessage(savedPlan.getId(), skipBudget));
 
-        return new CreationResult(savedPlan, savedFirstExpense);
+        return new CreationResultDTO(savedPlan, savedFirstExpense);
     }
 
     @Override
@@ -83,6 +84,8 @@ public class InstallmentPlanServiceImpl implements IInstallmentPlanService {
                 expenseService.save(installment, skipBudget);
 
                 log.debug("Installment {}/{} created for plan id={}", i, plan.getTotalInstallments(), plan.getId());
+            } catch (ExternalServiceException e) {
+                throw e;
             } catch (Exception e) {
                 log.error("Failed to create installment {}/{} for plan id={}. Reason: {}",
                         i, plan.getTotalInstallments(), plan.getId(), e.getMessage(), e);
