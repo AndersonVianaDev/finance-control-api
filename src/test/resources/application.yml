@@ -38,6 +38,9 @@ app:
       requests-per-minute: 5
     auth:
       requests-per-minute: 2
+  client:
+    url:
+      calendar-api: http://localhost
 
 spring.threads.virtual.enabled: true
 
