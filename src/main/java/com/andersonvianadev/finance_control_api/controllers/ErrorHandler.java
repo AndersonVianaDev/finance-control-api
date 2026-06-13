@@ -60,6 +60,12 @@ public class ErrorHandler {
         return ResponseEntity.status(exception.status()).body(exception);
     }
 
+    @ExceptionHandler(ExternalServiceException.class)
+    public ResponseEntity<StandardException> externalServiceException(ExternalServiceException e, HttpServletRequest request) {
+        StandardException exception = new StandardException(Instant.now(), HttpStatus.BAD_GATEWAY.value(), e.getMessage(), request.getRequestURI());
+        return ResponseEntity.status(exception.status()).body(exception);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<StandardException> exceptionGeneric(Exception e, HttpServletRequest request) {
         StandardException exception = new StandardException(Instant.now(), HttpStatus.INTERNAL_SERVER_ERROR.value(), e.getMessage(), request.getRequestURI());
