@@ -40,3 +40,9 @@ app:
       requests-per-minute: 2
 
 spring.threads.virtual.enabled: true
+
+aws:
+  enabled: false
+  sqs:
+    queues:
+      installment-generation: http://test-queue/000000000000/installment-generation-queue
