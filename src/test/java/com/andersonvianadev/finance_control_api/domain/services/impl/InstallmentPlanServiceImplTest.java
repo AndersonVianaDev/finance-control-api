@@ -4,12 +4,12 @@ import com.andersonvianadev.finance_control_api.domain.models.Category;
 import com.andersonvianadev.finance_control_api.domain.models.Expense;
 import com.andersonvianadev.finance_control_api.domain.models.InstallmentPlan;
 import com.andersonvianadev.finance_control_api.domain.models.User;
+import com.andersonvianadev.finance_control_api.domain.models.dtos.CreationResultDTO;
 import com.andersonvianadev.finance_control_api.domain.models.dtos.InstallmentGenerationMessage;
 import com.andersonvianadev.finance_control_api.domain.models.enums.InstallmentStatus;
 import com.andersonvianadev.finance_control_api.domain.models.enums.UserRole;
 import com.andersonvianadev.finance_control_api.domain.services.ICategoryService;
 import com.andersonvianadev.finance_control_api.domain.services.IExpenseService;
-import com.andersonvianadev.finance_control_api.domain.services.IInstallmentPlanService.CreationResult;
 import com.andersonvianadev.finance_control_api.infra.exceptions.NotFoundException;
 import com.andersonvianadev.finance_control_api.infra.messaging.ISqsMessageSender;
 import com.andersonvianadev.finance_control_api.infra.repositories.InstallmentPlanRepository;
@@ -121,7 +121,7 @@ class InstallmentPlanServiceImplTest {
         doReturn(savedPlan).when(repository).save(any());
         doReturn(savedFirstExpense).when(expenseService).save(any(), any(Boolean.class));
 
-        CreationResult result = service.create(planRequest, false);
+        CreationResultDTO result = service.create(planRequest, false);
 
         assertNotNull(result);
         assertEquals(savedPlan, result.plan());
