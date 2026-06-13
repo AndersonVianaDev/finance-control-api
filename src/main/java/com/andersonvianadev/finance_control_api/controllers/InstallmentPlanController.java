@@ -6,8 +6,8 @@ import com.andersonvianadev.finance_control_api.controllers.dtos.responses.Insta
 import com.andersonvianadev.finance_control_api.controllers.mappers.InstallmentPlanMapper;
 import com.andersonvianadev.finance_control_api.domain.models.InstallmentPlan;
 import com.andersonvianadev.finance_control_api.domain.models.User;
+import com.andersonvianadev.finance_control_api.domain.models.dtos.CreationResultDTO;
 import com.andersonvianadev.finance_control_api.domain.services.IInstallmentPlanService;
-import com.andersonvianadev.finance_control_api.domain.services.IInstallmentPlanService.CreationResult;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -34,7 +34,7 @@ public class InstallmentPlanController implements IInstallmentPlanController {
             @RequestBody @Valid InstallmentPlanRequestDTO request) {
 
         InstallmentPlan plan = InstallmentPlanMapper.toDomain(user, request);
-        CreationResult result = service.create(plan, skipBudget);
+        CreationResultDTO result = service.create(plan, skipBudget);
 
         InstallmentPlanResponseDTO response = InstallmentPlanMapper.toResponse(result.plan(), result.firstExpense());
 
