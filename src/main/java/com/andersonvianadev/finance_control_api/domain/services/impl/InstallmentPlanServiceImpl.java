@@ -4,6 +4,7 @@ import com.andersonvianadev.finance_control_api.domain.models.Category;
 import com.andersonvianadev.finance_control_api.domain.models.Expense;
 import com.andersonvianadev.finance_control_api.domain.models.InstallmentPlan;
 import com.andersonvianadev.finance_control_api.domain.models.User;
+import com.andersonvianadev.finance_control_api.domain.models.dtos.CreationResultDTO;
 import com.andersonvianadev.finance_control_api.domain.models.dtos.InstallmentGenerationMessage;
 import com.andersonvianadev.finance_control_api.domain.services.ICategoryService;
 import com.andersonvianadev.finance_control_api.domain.services.IExpenseService;
@@ -32,7 +33,7 @@ public class InstallmentPlanServiceImpl implements IInstallmentPlanService {
     private String installmentGenerationQueueUrl;
 
     @Override
-    public CreationResult create(InstallmentPlan plan, boolean skipBudget) {
+    public CreationResultDTO create(InstallmentPlan plan, boolean skipBudget) {
         User owner = plan.getOwner();
         Category category = categoryService.findByIdAndOwnerOrOwnerIsNull(plan.getCategory().getId(), owner);
         plan.setCategory(category);
