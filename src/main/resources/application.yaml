@@ -47,7 +47,7 @@ spring.threads.virtual.enabled: true
 
 aws:
   enabled: true
-  region: us-east-1
+  region: ${AWS_REGION}
   access-key: ${AWS_ACCESS_KEY}
   secret-key: ${AWS_SECRET_KEY}
   endpoint-override: ${AWS_ENDPOINT}
