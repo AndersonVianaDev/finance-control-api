@@ -2,6 +2,7 @@ package com.andersonvianadev.finance_control_api.controllers.docs;
 
 import com.andersonvianadev.finance_control_api.controllers.dtos.requests.InstallmentPlanRequestDTO;
 import com.andersonvianadev.finance_control_api.controllers.dtos.responses.InstallmentPlanResponseDTO;
+import com.andersonvianadev.finance_control_api.controllers.dtos.responses.PageResponseDTO;
 import com.andersonvianadev.finance_control_api.domain.models.User;
 import com.andersonvianadev.finance_control_api.infra.exceptions.StandardException;
 import io.swagger.v3.oas.annotations.Operation;
@@ -13,10 +14,15 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
+
+import java.util.UUID;
 
 @Tag(
         name = "Installment Plans",
@@ -69,25 +75,27 @@ public interface IInstallmentPlanController {
                                                                 "email": "anderson@gmail.com"
                                                             }
                                                         },
-                                                        "firstExpense": {
-                                                            "id": "f1e2d3c4-9876-5432-fedc-ba0987654321",
-                                                            "transactionDate": "2026-07-01T00:00:00",
-                                                            "price": 1500.00,
-                                                            "description": "MacBook Pro 14",
-                                                            "category": {
-                                                                "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-                                                                "name": "Technology",
-                                                                "description": "Electronics and gadgets",
-                                                                "icon": "tech",
-                                                                "owner": {
-                                                                    "id": "9cb12d90-4623-41c2-b3fc-1a963f77bcf1",
-                                                                    "name": "Anderson",
-                                                                    "email": "anderson@gmail.com"
-                                                                }
-                                                            },
-                                                            "installmentNumber": 1,
-                                                            "totalInstallments": 12
-                                                        }
+                                                        "expenses": [
+                                                            {
+                                                                "id": "f1e2d3c4-9876-5432-fedc-ba0987654321",
+                                                                "transactionDate": "2026-07-01T00:00:00",
+                                                                "price": 1500.00,
+                                                                "description": "MacBook Pro 14",
+                                                                "category": {
+                                                                    "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+                                                                    "name": "Technology",
+                                                                    "description": "Electronics and gadgets",
+                                                                    "icon": "tech",
+                                                                    "owner": {
+                                                                        "id": "9cb12d90-4623-41c2-b3fc-1a963f77bcf1",
+                                                                        "name": "Anderson",
+                                                                        "email": "anderson@gmail.com"
+                                                                    }
+                                                                },
+                                                                "installmentNumber": 1,
+                                                                "totalInstallments": 12
+                                                            }
+                                                        ]
                                                     }
                                                     """
                                     )
@@ -209,5 +217,241 @@ public interface IInstallmentPlanController {
                     )
             )
             @RequestBody @Valid InstallmentPlanRequestDTO request
+    );
+
+    @Operation(
+            summary = "Get installment plan by id",
+            description = "Returns the installment plan identified by id. Only plans belonging to the authenticated user are accessible. The firstExpense field is null for this endpoint.",
+            security = @SecurityRequirement(name = "bearerAuth"),
+            responses = {
+                    @ApiResponse(
+                            responseCode = "200",
+                            description = "Plan found.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = InstallmentPlanResponseDTO.class),
+                                    examples = @ExampleObject(
+                                            name = "Plan found.",
+                                            value = """
+                                                    {
+                                                        "id": "a1b2c3d4-1234-5678-abcd-ef0123456789",
+                                                        "description": "MacBook Pro 14",
+                                                        "totalAmount": 18000.00,
+                                                        "installmentAmount": 1500.00,
+                                                        "totalInstallments": 12,
+                                                        "paidInstallments": 0,
+                                                        "status": "ACTIVE",
+                                                        "firstDueDate": "2026-07-01",
+                                                        "category": {
+                                                            "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+                                                            "name": "Technology",
+                                                            "description": "Electronics and gadgets",
+                                                            "icon": "tech",
+                                                            "owner": {
+                                                                "id": "9cb12d90-4623-41c2-b3fc-1a963f77bcf1",
+                                                                "name": "Anderson",
+                                                                "email": "anderson@gmail.com"
+                                                            }
+                                                        },
+                                                        "expenses": []
+                                                    }
+                                                    """
+                                    )
+                            )
+                    ),
+                    @ApiResponse(
+                            responseCode = "404",
+                            description = "Plan not found.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = StandardException.class),
+                                    examples = @ExampleObject(
+                                            name = "Plan not found.",
+                                            value = """
+                                                    {
+                                                        "timestamp": "2026-06-07T09:00:00Z",
+                                                        "status": 404,
+                                                        "error": "Installment Plan with id a1b2c3d4-1234-5678-abcd-ef0123456789 not found",
+                                                        "path": "/nix-finance-api/installment-plans/a1b2c3d4-1234-5678-abcd-ef0123456789"
+                                                    }
+                                                    """
+                                    )
+                            )
+                    ),
+                    @ApiResponse(
+                            responseCode = "401",
+                            description = "Unauthorized. Missing or invalid JWT token.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = StandardException.class),
+                                    examples = @ExampleObject(
+                                            name = "Missing or invalid token.",
+                                            value = """
+                                                    {
+                                                        "timestamp": "2026-06-07T09:00:00Z",
+                                                        "status": 401,
+                                                        "error": "Unauthorized",
+                                                        "path": "/nix-finance-api/installment-plans/a1b2c3d4-1234-5678-abcd-ef0123456789"
+                                                    }
+                                                    """
+                                    )
+                            )
+                    )
+            }
+    )
+    ResponseEntity<InstallmentPlanResponseDTO> findById(
+            @Parameter(hidden = true)
+            @AuthenticationPrincipal(expression = "user") User user,
+            @Parameter(description = "Installment plan id", example = "a1b2c3d4-1234-5678-abcd-ef0123456789")
+            @PathVariable UUID id
+    );
+
+    @Operation(
+            summary = "List installment plans",
+            description = "Returns a paginated list of the authenticated user's installment plans. The firstExpense field is null for all items in this endpoint.",
+            security = @SecurityRequirement(name = "bearerAuth"),
+            responses = {
+                    @ApiResponse(
+                            responseCode = "200",
+                            description = "Page of plans. May be empty if the user has no plans.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    examples = @ExampleObject(
+                                            name = "Page with one plan.",
+                                            value = """
+                                                    {
+                                                        "content": [
+                                                            {
+                                                                "id": "a1b2c3d4-1234-5678-abcd-ef0123456789",
+                                                                "description": "MacBook Pro 14",
+                                                                "totalAmount": 18000.00,
+                                                                "installmentAmount": 1500.00,
+                                                                "totalInstallments": 12,
+                                                                "paidInstallments": 0,
+                                                                "status": "ACTIVE",
+                                                                "firstDueDate": "2026-07-01",
+                                                                "category": {
+                                                                    "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+                                                                    "name": "Technology",
+                                                                    "description": "Electronics and gadgets",
+                                                                    "icon": "tech",
+                                                                    "owner": null
+                                                                },
+                                                                "expenses": []
+                                                            }
+                                                        ],
+                                                        "page": 0,
+                                                        "size": 10,
+                                                        "totalElement": 1,
+                                                        "totalPages": 1,
+                                                        "last": true
+                                                    }
+                                                    """
+                                    )
+                            )
+                    ),
+                    @ApiResponse(
+                            responseCode = "401",
+                            description = "Unauthorized. Missing or invalid JWT token.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = StandardException.class),
+                                    examples = @ExampleObject(
+                                            name = "Missing or invalid token.",
+                                            value = """
+                                                    {
+                                                        "timestamp": "2026-06-07T09:00:00Z",
+                                                        "status": 401,
+                                                        "error": "Unauthorized",
+                                                        "path": "/nix-finance-api/installment-plans"
+                                                    }
+                                                    """
+                                    )
+                            )
+                    )
+            }
+    )
+    ResponseEntity<PageResponseDTO<InstallmentPlanResponseDTO>> findAll(
+            @Parameter(hidden = true)
+            @AuthenticationPrincipal(expression = "user") User user,
+            @PageableDefault(size = 10) Pageable pageable
+    );
+
+    @Operation(
+            summary = "Cancel installment plan",
+            description = """
+                    Cancels the installment plan and deletes all its associated expense records.
+                    This operation is irreversible. Only ACTIVE plans can be cancelled.
+                    """,
+            security = @SecurityRequirement(name = "bearerAuth"),
+            responses = {
+                    @ApiResponse(
+                            responseCode = "204",
+                            description = "Plan cancelled. All associated expenses deleted."
+                    ),
+                    @ApiResponse(
+                            responseCode = "422",
+                            description = "Plan is already cancelled.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = StandardException.class),
+                                    examples = @ExampleObject(
+                                            name = "Already cancelled.",
+                                            value = """
+                                                    {
+                                                        "timestamp": "2026-06-07T09:00:00Z",
+                                                        "status": 422,
+                                                        "error": "Installment plan is already cancelled.",
+                                                        "path": "/nix-finance-api/installment-plans/a1b2c3d4-1234-5678-abcd-ef0123456789"
+                                                    }
+                                                    """
+                                    )
+                            )
+                    ),
+                    @ApiResponse(
+                            responseCode = "404",
+                            description = "Plan not found.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = StandardException.class),
+                                    examples = @ExampleObject(
+                                            name = "Plan not found.",
+                                            value = """
+                                                    {
+                                                        "timestamp": "2026-06-07T09:00:00Z",
+                                                        "status": 404,
+                                                        "error": "Installment Plan with id a1b2c3d4-1234-5678-abcd-ef0123456789 not found",
+                                                        "path": "/nix-finance-api/installment-plans/a1b2c3d4-1234-5678-abcd-ef0123456789"
+                                                    }
+                                                    """
+                                    )
+                            )
+                    ),
+                    @ApiResponse(
+                            responseCode = "401",
+                            description = "Unauthorized. Missing or invalid JWT token.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = StandardException.class),
+                                    examples = @ExampleObject(
+                                            name = "Missing or invalid token.",
+                                            value = """
+                                                    {
+                                                        "timestamp": "2026-06-07T09:00:00Z",
+                                                        "status": 401,
+                                                        "error": "Unauthorized",
+                                                        "path": "/nix-finance-api/installment-plans/a1b2c3d4-1234-5678-abcd-ef0123456789"
+                                                    }
+                                                    """
+                                    )
+                            )
+                    )
+            }
+    )
+    ResponseEntity<Void> cancel(
+            @Parameter(hidden = true)
+            @AuthenticationPrincipal(expression = "user") User user,
+            @Parameter(description = "Installment plan id", example = "a1b2c3d4-1234-5678-abcd-ef0123456789")
+            @PathVariable UUID id
     );
 }
