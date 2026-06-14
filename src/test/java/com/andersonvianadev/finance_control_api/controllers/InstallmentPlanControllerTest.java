@@ -16,7 +16,9 @@ import com.andersonvianadev.finance_control_api.infra.messaging.consumer.Install
 import com.andersonvianadev.finance_control_api.infra.repositories.CategoryRepository;
 import org.springframework.context.ApplicationContext;
 import com.andersonvianadev.finance_control_api.infra.repositories.ExpenseRepository;
+import com.andersonvianadev.finance_control_api.infra.repositories.IncomeRepository;
 import com.andersonvianadev.finance_control_api.infra.repositories.InstallmentPlanRepository;
+import com.andersonvianadev.finance_control_api.infra.repositories.RecurringRuleRepository;
 import com.andersonvianadev.finance_control_api.infra.repositories.UserRepository;
 import com.andersonvianadev.finance_control_api.infra.security.UserPrincipal;
 import org.junit.jupiter.api.BeforeEach;
@@ -95,10 +97,18 @@ class InstallmentPlanControllerTest {
     @Autowired
     private ExpenseRepository expenseRepository;
 
+    @Autowired
+    private IncomeRepository incomeRepository;
+
+    @Autowired
+    private RecurringRuleRepository recurringRuleRepository;
+
     @BeforeEach
     void setup() {
+        incomeRepository.deleteAll();
         expenseRepository.deleteAll();
         installmentPlanRepository.deleteAll();
+        recurringRuleRepository.deleteAll();
         categoryRepository.deleteAll();
         userRepository.deleteAll();
 
