@@ -121,6 +121,27 @@ public class BudgetServiceImpl implements IBudgetService {
                 throw new BudgetExceededException("Budget limit exceeded for category: " + category.getName());
             }
         }
+    }
 
+    @Override
+    public void validateTransactionRespectsBudgetOnUpdate(User owner, Category category, BigDecimal oldPrice, BigDecimal newPrice) {
+        UUID ownerId = owner.getId();
+        UUID categoryId = category.getId();
+
+        Optional<Budget> budgetOptional = repository.findByOwnerIdAndCategoryIdAndActiveTrue(ownerId, categoryId);
+
+        if(budgetOptional.isPresent()) {
+            Budget budget = budgetOptional.get();
+            BudgetType budgetType = budget.getBudgetType();
+
+            PeriodDTO period = budgetType.getPeriod();
+            BigDecimal totalSpent = expenseRepository.sumByOwnerAndCategoryAndDateRange(
+                    ownerId, categoryId, period.startDate(), period.endDate());
+
+            // totalSpent includes the expense with oldPrice; subtract it and add newPrice for the actual projected total
+            if(totalSpent.subtract(oldPrice).add(newPrice).compareTo(budget.getLimitAmount()) > 0) {
+                throw new BudgetExceededException("Budget limit exceeded for category: " + category.getName());
+            }
+        }
     }
 }

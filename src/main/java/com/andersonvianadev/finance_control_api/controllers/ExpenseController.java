@@ -2,6 +2,7 @@ package com.andersonvianadev.finance_control_api.controllers;
 
 import com.andersonvianadev.finance_control_api.controllers.docs.IExpenseController;
 import com.andersonvianadev.finance_control_api.controllers.dtos.requests.ExpenseRequestDTO;
+import com.andersonvianadev.finance_control_api.controllers.dtos.requests.ExpenseUpdateDTO;
 import com.andersonvianadev.finance_control_api.controllers.dtos.responses.ExpenseResponseDTO;
 import com.andersonvianadev.finance_control_api.controllers.dtos.responses.PageResponseDTO;
 import com.andersonvianadev.finance_control_api.controllers.mappers.ExpenseMapper;
@@ -68,5 +69,20 @@ public class ExpenseController implements IExpenseController {
     ) {
         service.delete(user, id);
         return ResponseEntity.noContent().build();
+    }
+
+    @Override
+    @PutMapping("/{id}")
+    public ResponseEntity<ExpenseResponseDTO> update(
+            @AuthenticationPrincipal(expression = "user") User user,
+            @RequestHeader(value = "X-SKIP-BUDGET", required = false, defaultValue = "false") boolean skipBudget,
+            @PathVariable UUID id,
+            @RequestBody @Valid ExpenseUpdateDTO request
+    ) {
+        Expense expense = ExpenseMapper.toDomain(user, id, request);
+        expense = service.update(expense, skipBudget);
+
+        ExpenseResponseDTO response = ExpenseMapper.toResponse(expense);
+        return ResponseEntity.ok(response);
     }
 }

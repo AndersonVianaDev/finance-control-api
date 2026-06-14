@@ -487,6 +487,91 @@ class BudgetServiceImplTest {
         verify(expenseRepository, times(1)).sumByOwnerAndCategoryAndDateRange(any(), any(), any(), any());
     }
 
+    // ── validateTransactionRespectsBudgetOnUpdate ─────────────────────────────
+
+    @Test
+    @DisplayName("Should pass update validation when no active budget exists for category")
+    void validateTransactionRespectsBudgetOnUpdate_WhenNoBudgetExists_ShouldNotThrow() {
+        User user = User.builder().id(UUID.randomUUID()).name("Anderson")
+                .email("anderson@gmail.com").password("password").role(UserRole.ROLE_USER).build();
+        Category category = Category.builder().id(UUID.randomUUID()).name("food")
+                .description("food description").icon("food").owner(user).build();
+
+        doReturn(Optional.empty()).when(repository).findByOwnerIdAndCategoryIdAndActiveTrue(user.getId(), category.getId());
+
+        service.validateTransactionRespectsBudgetOnUpdate(
+                user, category, new BigDecimal("100.00"), new BigDecimal("200.00"));
+
+        verify(expenseRepository, never()).sumByOwnerAndCategoryAndDateRange(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("Should pass update validation when price increase keeps total within budget limit")
+    void validateTransactionRespectsBudgetOnUpdate_WhenPriceIncreasedAndWithinLimit_ShouldNotThrow() {
+        User user = User.builder().id(UUID.randomUUID()).name("Anderson")
+                .email("anderson@gmail.com").password("password").role(UserRole.ROLE_USER).build();
+        Category category = Category.builder().id(UUID.randomUUID()).name("food")
+                .description("food description").icon("food").owner(user).build();
+
+        Budget budget = Budget.builder().id(UUID.randomUUID()).owner(user).category(category)
+                .budgetType(BudgetType.MONTHLY).limitAmount(new BigDecimal("1000.00")).active(true).build();
+
+        // totalSpent=700 (includes old 100); projected = 700 - 100 + 200 = 800 <= 1000
+        doReturn(Optional.of(budget)).when(repository).findByOwnerIdAndCategoryIdAndActiveTrue(user.getId(), category.getId());
+        doReturn(new BigDecimal("700.00")).when(expenseRepository)
+                .sumByOwnerAndCategoryAndDateRange(any(), any(), any(), any());
+
+        service.validateTransactionRespectsBudgetOnUpdate(
+                user, category, new BigDecimal("100.00"), new BigDecimal("200.00"));
+
+        verify(expenseRepository, times(1)).sumByOwnerAndCategoryAndDateRange(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("Should throw BudgetExceededException when price increase causes total to exceed budget limit")
+    void validateTransactionRespectsBudgetOnUpdate_WhenPriceIncreasedAndExceedsLimit_ShouldThrowBudgetExceededException() {
+        User user = User.builder().id(UUID.randomUUID()).name("Anderson")
+                .email("anderson@gmail.com").password("password").role(UserRole.ROLE_USER).build();
+        Category category = Category.builder().id(UUID.randomUUID()).name("food")
+                .description("food description").icon("food").owner(user).build();
+
+        Budget budget = Budget.builder().id(UUID.randomUUID()).owner(user).category(category)
+                .budgetType(BudgetType.MONTHLY).limitAmount(new BigDecimal("1000.00")).active(true).build();
+
+        // totalSpent=900 (includes old 100); projected = 900 - 100 + 400 = 1200 > 1000
+        doReturn(Optional.of(budget)).when(repository).findByOwnerIdAndCategoryIdAndActiveTrue(user.getId(), category.getId());
+        doReturn(new BigDecimal("900.00")).when(expenseRepository)
+                .sumByOwnerAndCategoryAndDateRange(any(), any(), any(), any());
+
+        assertThrows(BudgetExceededException.class,
+                () -> service.validateTransactionRespectsBudgetOnUpdate(
+                        user, category, new BigDecimal("100.00"), new BigDecimal("400.00")));
+
+        verify(expenseRepository, times(1)).sumByOwnerAndCategoryAndDateRange(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("Should pass update validation when price decreases since projected total can only improve")
+    void validateTransactionRespectsBudgetOnUpdate_WhenPriceDecreased_ShouldNotThrow() {
+        User user = User.builder().id(UUID.randomUUID()).name("Anderson")
+                .email("anderson@gmail.com").password("password").role(UserRole.ROLE_USER).build();
+        Category category = Category.builder().id(UUID.randomUUID()).name("food")
+                .description("food description").icon("food").owner(user).build();
+
+        Budget budget = Budget.builder().id(UUID.randomUUID()).owner(user).category(category)
+                .budgetType(BudgetType.MONTHLY).limitAmount(new BigDecimal("1000.00")).active(true).build();
+
+        // totalSpent=900 (includes old 300); projected = 900 - 300 + 100 = 700 <= 1000
+        doReturn(Optional.of(budget)).when(repository).findByOwnerIdAndCategoryIdAndActiveTrue(user.getId(), category.getId());
+        doReturn(new BigDecimal("900.00")).when(expenseRepository)
+                .sumByOwnerAndCategoryAndDateRange(any(), any(), any(), any());
+
+        service.validateTransactionRespectsBudgetOnUpdate(
+                user, category, new BigDecimal("300.00"), new BigDecimal("100.00"));
+
+        verify(expenseRepository, times(1)).sumByOwnerAndCategoryAndDateRange(any(), any(), any(), any());
+    }
+
     @Test
     @DisplayName("Should return empty page when no budgets exist")
     void findAll_WhenNoBudgetsExist_ShouldReturnEmptyPage() {

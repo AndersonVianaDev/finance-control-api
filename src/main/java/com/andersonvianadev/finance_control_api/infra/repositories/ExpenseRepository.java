@@ -34,6 +34,26 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
             @Param("description") String description
     );
 
+    @Query(value = """
+            SELECT EXISTS (
+                SELECT 1 FROM tb_expenses
+                WHERE owner_id = :ownerId
+                  AND category_id = :categoryId
+                  AND price = :price
+                  AND transaction_date = :transactionDate
+                  AND description = :description
+                  AND id != :excludeId
+            )
+            """, nativeQuery = true)
+    boolean existsDuplicateExcluding(
+            @Param("ownerId") UUID ownerId,
+            @Param("categoryId") UUID categoryId,
+            @Param("price") BigDecimal price,
+            @Param("transactionDate") LocalDateTime transactionDate,
+            @Param("description") String description,
+            @Param("excludeId") UUID excludeId
+    );
+
     @Query("SELECT COALESCE(SUM(e.price), 0) FROM Expense e " +
             "WHERE e.owner.id = :ownerId " +
             "AND e.category.id = :categoryId " +
