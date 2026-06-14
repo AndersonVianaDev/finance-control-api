@@ -6,6 +6,7 @@ import com.andersonvianadev.finance_control_api.domain.models.User;
 import com.andersonvianadev.finance_control_api.domain.models.enums.BudgetType;
 import com.andersonvianadev.finance_control_api.domain.models.enums.UserRole;
 import com.andersonvianadev.finance_control_api.domain.services.ICategoryService;
+import com.andersonvianadev.finance_control_api.infra.exceptions.BudgetExceededException;
 import com.andersonvianadev.finance_control_api.infra.exceptions.NotFoundException;
 import com.andersonvianadev.finance_control_api.infra.exceptions.ResourceAlreadyExistsException;
 import com.andersonvianadev.finance_control_api.infra.repositories.BudgetRepository;
@@ -23,6 +24,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -425,6 +427,64 @@ class BudgetServiceImplTest {
         assertEquals(1, result.getTotalElements());
         assertEquals(budget, result.getContent().getFirst());
         verify(repository, times(1)).findByOwner(user, pageable);
+    }
+
+    // ── validateTransactionRespectsBudget ─────────────────────────────────────
+
+    @Test
+    @DisplayName("Should pass validation when no active budget exists for category")
+    void validateTransactionRespectsBudget_WhenNoBudgetExists_ShouldNotThrow() {
+        User user = User.builder().id(UUID.randomUUID()).name("Anderson")
+                .email("anderson@gmail.com").password("password").role(UserRole.ROLE_USER).build();
+        Category category = Category.builder().id(UUID.randomUUID()).name("food")
+                .description("food description").icon("food").owner(user).build();
+
+        doReturn(Optional.empty()).when(repository).findByOwnerIdAndCategoryIdAndActiveTrue(user.getId(), category.getId());
+
+        service.validateTransactionRespectsBudget(user, category, new BigDecimal("500.00"));
+
+        verify(expenseRepository, never()).sumByOwnerAndCategoryAndDateRange(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("Should pass validation when budget exists and transaction is within limit")
+    void validateTransactionRespectsBudget_WhenBudgetExistsAndTransactionIsWithinLimit_ShouldNotThrow() {
+        User user = User.builder().id(UUID.randomUUID()).name("Anderson")
+                .email("anderson@gmail.com").password("password").role(UserRole.ROLE_USER).build();
+        Category category = Category.builder().id(UUID.randomUUID()).name("food")
+                .description("food description").icon("food").owner(user).build();
+
+        Budget budget = Budget.builder().id(UUID.randomUUID()).owner(user).category(category)
+                .budgetType(BudgetType.MONTHLY).limitAmount(new BigDecimal("1000.00")).active(true).build();
+
+        doReturn(Optional.of(budget)).when(repository).findByOwnerIdAndCategoryIdAndActiveTrue(user.getId(), category.getId());
+        doReturn(new BigDecimal("400.00")).when(expenseRepository)
+                .sumByOwnerAndCategoryAndDateRange(any(), any(), any(), any());
+
+        service.validateTransactionRespectsBudget(user, category, new BigDecimal("500.00"));
+
+        verify(expenseRepository, times(1)).sumByOwnerAndCategoryAndDateRange(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("Should throw BudgetExceededException when transaction would exceed budget limit")
+    void validateTransactionRespectsBudget_WhenTransactionExceedsLimit_ShouldThrowBudgetExceededException() {
+        User user = User.builder().id(UUID.randomUUID()).name("Anderson")
+                .email("anderson@gmail.com").password("password").role(UserRole.ROLE_USER).build();
+        Category category = Category.builder().id(UUID.randomUUID()).name("food")
+                .description("food description").icon("food").owner(user).build();
+
+        Budget budget = Budget.builder().id(UUID.randomUUID()).owner(user).category(category)
+                .budgetType(BudgetType.MONTHLY).limitAmount(new BigDecimal("1000.00")).active(true).build();
+
+        doReturn(Optional.of(budget)).when(repository).findByOwnerIdAndCategoryIdAndActiveTrue(user.getId(), category.getId());
+        doReturn(new BigDecimal("800.00")).when(expenseRepository)
+                .sumByOwnerAndCategoryAndDateRange(any(), any(), any(), any());
+
+        assertThrows(BudgetExceededException.class,
+                () -> service.validateTransactionRespectsBudget(user, category, new BigDecimal("300.00")));
+
+        verify(expenseRepository, times(1)).sumByOwnerAndCategoryAndDateRange(any(), any(), any(), any());
     }
 
     @Test

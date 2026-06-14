@@ -59,4 +59,14 @@ public class ExpenseController implements IExpenseController {
         Page<ExpenseResponseDTO> responsePage = service.findAll(user, pageable).map(ExpenseMapper::toResponse);
         return ResponseEntity.ok(PageResponseDTO.of(responsePage));
     }
+
+    @Override
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(
+            @AuthenticationPrincipal(expression = "user") User user,
+            @PathVariable UUID id
+    ) {
+        service.delete(user, id);
+        return ResponseEntity.noContent().build();
+    }
 }

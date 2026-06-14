@@ -66,6 +66,12 @@ public class ErrorHandler {
         return ResponseEntity.status(exception.status()).body(exception);
     }
 
+    @ExceptionHandler(DeleteNotAllowedException.class)
+    public ResponseEntity<StandardException> deleteNotAllowedException(DeleteNotAllowedException e, HttpServletRequest request) {
+        StandardException exception = new StandardException(Instant.now(), HttpStatus.UNPROCESSABLE_ENTITY.value(), e.getMessage(), request.getRequestURI());
+        return ResponseEntity.status(exception.status()).body(exception);
+    }
+
     @ExceptionHandler(ExternalServiceException.class)
     public ResponseEntity<StandardException> externalServiceException(ExternalServiceException e, HttpServletRequest request) {
         StandardException exception = new StandardException(Instant.now(), HttpStatus.BAD_GATEWAY.value(), e.getMessage(), request.getRequestURI());

@@ -6,6 +6,8 @@ import com.andersonvianadev.finance_control_api.controllers.dtos.responses.PageR
 import tools.jackson.databind.JavaType;
 import com.andersonvianadev.finance_control_api.domain.models.Budget;
 import com.andersonvianadev.finance_control_api.domain.models.Category;
+import com.andersonvianadev.finance_control_api.domain.models.Expense;
+import com.andersonvianadev.finance_control_api.domain.models.InstallmentPlan;
 import com.andersonvianadev.finance_control_api.domain.models.User;
 import com.andersonvianadev.finance_control_api.domain.models.enums.BudgetType;
 import com.andersonvianadev.finance_control_api.domain.models.enums.UserRole;
@@ -583,6 +585,141 @@ class ExpenseControllerTest {
     @DisplayName("Should return 403 when findAll request is unauthenticated")
     void findAll_WhenUnauthenticated_ShouldReturnForbidden() throws Exception {
         mockMvc.perform(MockMvcRequestBuilders.get("/expenses"))
+                .andExpect(MockMvcResultMatchers.status().isForbidden())
+                .andDo(MockMvcResultHandlers.print());
+    }
+
+    // ── delete ───────────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("Should delete expense and return 204 when expense exists and belongs to user")
+    void delete_WhenExpenseExistsAndBelongsToUser_ShouldReturn204() throws Exception {
+        User user = createUser("anderson@gmail.com");
+        Category category = createCategory(user);
+        UserPrincipal principal = new UserPrincipal(user);
+
+        MvcResult created = mockMvc.perform(MockMvcRequestBuilders.post("/expenses")
+                        .with(user(principal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new ExpenseRequestDTO(
+                                LocalDateTime.of(2026, 7, 1, 10, 0),
+                                new BigDecimal("150.00"),
+                                "Monthly gym membership",
+                                category.getId()
+                        ))))
+                .andExpect(MockMvcResultMatchers.status().isCreated())
+                .andReturn();
+
+        UUID expenseId = objectMapper.readValue(
+                created.getResponse().getContentAsString(), ExpenseResponseDTO.class).id();
+
+        mockMvc.perform(MockMvcRequestBuilders.delete("/expenses/{id}", expenseId)
+                        .with(user(principal)))
+                .andExpect(MockMvcResultMatchers.status().isNoContent())
+                .andDo(MockMvcResultHandlers.print());
+
+        assertEquals(0, expenseRepository.count());
+    }
+
+    @Test
+    @DisplayName("Should return 404 when expense does not exist")
+    void delete_WhenExpenseDoesNotExist_ShouldReturn404() throws Exception {
+        User user = createUser("anderson@gmail.com");
+        UserPrincipal principal = new UserPrincipal(user);
+
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.delete("/expenses/{id}", UUID.randomUUID())
+                        .with(user(principal)))
+                .andExpect(MockMvcResultMatchers.status().isNotFound())
+                .andDo(MockMvcResultHandlers.print())
+                .andReturn();
+
+        StandardException exception = objectMapper.readValue(
+                result.getResponse().getContentAsString(), StandardException.class);
+
+        assertEquals(HttpStatus.NOT_FOUND.value(), exception.status());
+    }
+
+    @Test
+    @DisplayName("Should return 404 when expense belongs to another user")
+    void delete_WhenExpenseBelongsToAnotherUser_ShouldReturn404() throws Exception {
+        User owner = createUser("anderson@gmail.com");
+        User other = createUser("other@gmail.com");
+        Category category = createCategory(owner);
+        UserPrincipal ownerPrincipal = new UserPrincipal(owner);
+        UserPrincipal otherPrincipal = new UserPrincipal(other);
+
+        MvcResult created = mockMvc.perform(MockMvcRequestBuilders.post("/expenses")
+                        .with(user(ownerPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new ExpenseRequestDTO(
+                                LocalDateTime.of(2026, 7, 1, 10, 0),
+                                new BigDecimal("150.00"),
+                                "Monthly gym membership",
+                                category.getId()
+                        ))))
+                .andExpect(MockMvcResultMatchers.status().isCreated())
+                .andReturn();
+
+        UUID expenseId = objectMapper.readValue(
+                created.getResponse().getContentAsString(), ExpenseResponseDTO.class).id();
+
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.delete("/expenses/{id}", expenseId)
+                        .with(user(otherPrincipal)))
+                .andExpect(MockMvcResultMatchers.status().isNotFound())
+                .andDo(MockMvcResultHandlers.print())
+                .andReturn();
+
+        StandardException exception = objectMapper.readValue(
+                result.getResponse().getContentAsString(), StandardException.class);
+
+        assertEquals(HttpStatus.NOT_FOUND.value(), exception.status());
+        assertEquals(1, expenseRepository.count());
+    }
+
+    @Test
+    @DisplayName("Should return 422 when expense is linked to an installment plan")
+    void delete_WhenExpenseIsLinkedToInstallmentPlan_ShouldReturn422() throws Exception {
+        User user = createUser("anderson@gmail.com");
+        Category category = createCategory(user);
+        UserPrincipal principal = new UserPrincipal(user);
+
+        InstallmentPlan plan = installmentPlanRepository.save(InstallmentPlan.builder()
+                .owner(user)
+                .category(category)
+                .description("MacBook Pro 12x")
+                .totalAmount(new BigDecimal("3600.00"))
+                .installmentAmount(new BigDecimal("300.00"))
+                .totalInstallments(12)
+                .firstDueDate(java.time.LocalDate.of(2026, 7, 1))
+                .build());
+
+        Expense installmentExpense = expenseRepository.save(Expense.builder()
+                .owner(user)
+                .category(category)
+                .installmentPlan(plan)
+                .transactionDate(LocalDateTime.of(2026, 7, 1, 0, 0))
+                .price(new BigDecimal("300.00"))
+                .description("MacBook Pro 12x")
+                .installmentNumber(1)
+                .build());
+
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.delete("/expenses/{id}", installmentExpense.getId())
+                        .with(user(principal)))
+                .andExpect(MockMvcResultMatchers.status().isUnprocessableEntity())
+                .andDo(MockMvcResultHandlers.print())
+                .andReturn();
+
+        StandardException exception = objectMapper.readValue(
+                result.getResponse().getContentAsString(), StandardException.class);
+
+        assertEquals(HttpStatus.UNPROCESSABLE_ENTITY.value(), exception.status());
+        assertEquals(1, expenseRepository.count());
+    }
+
+    @Test
+    @DisplayName("Should return 403 when delete request is unauthenticated")
+    void delete_WhenUnauthenticated_ShouldReturnForbidden() throws Exception {
+        mockMvc.perform(MockMvcRequestBuilders.delete("/expenses/{id}", UUID.randomUUID()))
                 .andExpect(MockMvcResultMatchers.status().isForbidden())
                 .andDo(MockMvcResultHandlers.print());
     }
