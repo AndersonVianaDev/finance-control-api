@@ -41,6 +41,8 @@ app:
   client:
     url:
       calendar-api: http://localhost
+    calendar-api:
+      api-key: test-key
 
 spring.threads.virtual.enabled: true
 
