@@ -9,6 +9,7 @@ import com.andersonvianadev.finance_control_api.domain.models.User;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.List;
 
 public class InstallmentPlanMapper {
 
@@ -27,7 +28,11 @@ public class InstallmentPlanMapper {
                 .build();
     }
 
-    public static InstallmentPlanResponseDTO toResponse(InstallmentPlan plan, Expense firstExpense) {
+    public static InstallmentPlanResponseDTO toResponse(InstallmentPlan plan) {
+        return toResponse(plan, List.of());
+    }
+
+    public static InstallmentPlanResponseDTO toResponse(InstallmentPlan plan, List<Expense> expenses) {
         return new InstallmentPlanResponseDTO(
                 plan.getId(),
                 plan.getDescription(),
@@ -38,7 +43,7 @@ public class InstallmentPlanMapper {
                 plan.getStatus(),
                 plan.getFirstDueDate(),
                 CategoryMapper.toResponse(plan.getCategory()),
-                ExpenseMapper.toResponse(firstExpense)
+                expenses.stream().map(ExpenseMapper::toResponse).toList()
         );
     }
 }

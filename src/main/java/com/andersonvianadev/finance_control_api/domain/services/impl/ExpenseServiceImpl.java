@@ -22,6 +22,7 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Slf4j
@@ -186,5 +187,16 @@ public class ExpenseServiceImpl implements IExpenseService {
             );
             throw new ResourceAlreadyExistsException("Expense already registered");
         }
+    }
+
+    @Override
+    @Transactional
+    public void deleteByInstallmentPlan(UUID planId) {
+        repository.deleteByInstallmentPlanId(planId);
+    }
+
+    @Override
+    public List<Expense> findByInstallmentPlan(UUID planId) {
+        return repository.findByInstallmentPlanIdOrderByInstallmentNumberAsc(planId);
     }
 }

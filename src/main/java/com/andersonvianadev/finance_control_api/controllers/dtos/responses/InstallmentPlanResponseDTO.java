@@ -4,6 +4,7 @@ import com.andersonvianadev.finance_control_api.domain.models.enums.InstallmentS
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 public record InstallmentPlanResponseDTO(
@@ -16,6 +17,6 @@ public record InstallmentPlanResponseDTO(
         InstallmentStatus status,
         LocalDate firstDueDate,
         CategoryResponseDTO category,
-        ExpenseResponseDTO firstExpense
+        List<ExpenseResponseDTO> expenses
 ) {
 }

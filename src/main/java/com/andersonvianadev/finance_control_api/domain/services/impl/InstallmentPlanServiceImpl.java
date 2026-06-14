@@ -6,16 +6,21 @@ import com.andersonvianadev.finance_control_api.domain.models.InstallmentPlan;
 import com.andersonvianadev.finance_control_api.domain.models.User;
 import com.andersonvianadev.finance_control_api.domain.models.dtos.CreationResultDTO;
 import com.andersonvianadev.finance_control_api.domain.models.dtos.InstallmentGenerationMessage;
+import com.andersonvianadev.finance_control_api.domain.models.enums.InstallmentStatus;
 import com.andersonvianadev.finance_control_api.domain.services.ICategoryService;
 import com.andersonvianadev.finance_control_api.domain.services.IExpenseService;
 import com.andersonvianadev.finance_control_api.domain.services.IInstallmentPlanService;
 import com.andersonvianadev.finance_control_api.infra.exceptions.ExternalServiceException;
 import com.andersonvianadev.finance_control_api.infra.exceptions.NotFoundException;
+import com.andersonvianadev.finance_control_api.infra.exceptions.OperationNotAllowedException;
 import com.andersonvianadev.finance_control_api.infra.messaging.ISqsMessageSender;
 import com.andersonvianadev.finance_control_api.infra.repositories.InstallmentPlanRepository;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.UUID;
@@ -93,5 +98,32 @@ public class InstallmentPlanServiceImpl implements IInstallmentPlanService {
         }
 
         log.info("Installment generation finished for plan id={}", plan.getId());
+    }
+
+    @Override
+    public InstallmentPlan findById(User user, UUID id) {
+        return repository.findByOwnerIdAndId(user.getId(), id)
+                .orElseThrow(() -> new NotFoundException(String.format("Installment Plan with id %s not found", id.toString())));
+    }
+
+    @Override
+    public Page<InstallmentPlan> findAll(User user, Pageable pageable) {
+        return repository.findByOwnerId(user.getId(), pageable);
+    }
+
+    @Override
+    @Transactional
+    public void cancel(User user, UUID id) {
+        InstallmentPlan plan = this.findById(user, id);
+
+        if(plan.getStatus() == InstallmentStatus.CANCELLED) {
+            throw new OperationNotAllowedException("Installment plan is already cancelled.");
+        }
+
+        expenseService.deleteByInstallmentPlan(plan.getId());
+        plan.setStatus(InstallmentStatus.CANCELLED);
+        repository.save(plan);
+
+        log.info("InstallmentPlan id={} cancelled. All associated expenses deleted.", plan.getId());
     }
 }
