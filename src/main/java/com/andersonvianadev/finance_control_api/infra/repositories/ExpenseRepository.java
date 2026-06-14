@@ -8,6 +8,7 @@ import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
@@ -41,4 +42,6 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
             @Param("categoryId") UUID categoryId,
             @Param("startDate") LocalDateTime startDate,
             @Param("endDate") LocalDateTime endDate);
+
+    Optional<Expense> findExpenseByOwnerIdAndId(UUID ownerId, UUID id);
 }

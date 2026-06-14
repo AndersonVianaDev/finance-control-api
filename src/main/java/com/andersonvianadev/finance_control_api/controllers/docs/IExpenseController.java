@@ -15,8 +15,11 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
+
+import java.util.UUID;
 
 @Tag(
         name = "Expenses",
@@ -199,5 +202,93 @@ public interface IExpenseController {
                     )
             )
             @RequestBody @Valid ExpenseRequestDTO request
+    );
+
+    @Operation(
+            summary = "Find expense by ID",
+            description = """
+                    Returns a single expense by its ID.
+
+                    The expense must belong to the authenticated user.
+                    """,
+            security = @SecurityRequirement(name = "bearerAuth"),
+            responses = {
+                    @ApiResponse(
+                            responseCode = "200",
+                            description = "Expense found successfully.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = ExpenseResponseDTO.class),
+                                    examples = @ExampleObject(
+                                            name = "Expense found.",
+                                            value = """
+                                                    {
+                                                        "id": "f1e2d3c4-9876-5432-fedc-ba0987654321",
+                                                        "transactionDate": "2026-06-13T10:00:00",
+                                                        "price": 150.00,
+                                                        "description": "Monthly gym membership",
+                                                        "category": {
+                                                            "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+                                                            "name": "Fitness",
+                                                            "description": "Gym and sports expenses",
+                                                            "icon": "fitness",
+                                                            "owner": {
+                                                                "id": "9cb12d90-4623-41c2-b3fc-1a963f77bcf1",
+                                                                "name": "Anderson",
+                                                                "email": "anderson@gmail.com"
+                                                            }
+                                                        },
+                                                        "installmentNumber": null,
+                                                        "totalInstallments": null
+                                                    }
+                                                    """
+                                    )
+                            )
+                    ),
+                    @ApiResponse(
+                            responseCode = "404",
+                            description = "Expense not found or does not belong to the authenticated user.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = StandardException.class),
+                                    examples = @ExampleObject(
+                                            name = "Expense not found.",
+                                            value = """
+                                                    {
+                                                        "timestamp": "2026-06-07T09:00:00Z",
+                                                        "status": 404,
+                                                        "error": "Expense not found.",
+                                                        "path": "/nix-finance-api/expenses/{id}"
+                                                    }
+                                                    """
+                                    )
+                            )
+                    ),
+                    @ApiResponse(
+                            responseCode = "401",
+                            description = "Unauthorized. Missing or invalid JWT token.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = StandardException.class),
+                                    examples = @ExampleObject(
+                                            name = "Missing or invalid token.",
+                                            value = """
+                                                    {
+                                                        "timestamp": "2026-06-07T09:00:00Z",
+                                                        "status": 401,
+                                                        "error": "Unauthorized",
+                                                        "path": "/nix-finance-api/expenses/{id}"
+                                                    }
+                                                    """
+                                    )
+                            )
+                    )
+            }
+    )
+    ResponseEntity<ExpenseResponseDTO> findById(
+            @Parameter(hidden = true)
+            @AuthenticationPrincipal(expression = "user") User user,
+            @Parameter(description = "Expense UUID.", required = true)
+            @PathVariable UUID id
     );
 }
