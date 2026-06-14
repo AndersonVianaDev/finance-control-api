@@ -12,6 +12,7 @@ import com.andersonvianadev.finance_control_api.domain.services.ICategoryService
 import com.andersonvianadev.finance_control_api.domain.services.IExpenseService;
 import com.andersonvianadev.finance_control_api.infra.exceptions.ExternalServiceException;
 import com.andersonvianadev.finance_control_api.infra.exceptions.NotFoundException;
+import com.andersonvianadev.finance_control_api.infra.exceptions.OperationNotAllowedException;
 import com.andersonvianadev.finance_control_api.infra.messaging.ISqsMessageSender;
 import com.andersonvianadev.finance_control_api.infra.repositories.InstallmentPlanRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,12 +29,20 @@ import java.time.LocalDate;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
@@ -374,6 +383,207 @@ class InstallmentPlanServiceImplTest {
 
         assertThrows(ExternalServiceException.class,
                 () -> service.generateRemainingInstallments(planId, false));
+    }
+
+    // --- findById() ---
+
+    @Test
+    @DisplayName("Should return plan when it exists and belongs to the user")
+    void findById_WhenPlanExists_ShouldReturnPlan() {
+        User user = User.builder()
+                .id(UUID.randomUUID())
+                .name("Anderson")
+                .email("anderson@gmail.com")
+                .password("password")
+                .role(UserRole.ROLE_USER)
+                .build();
+
+        UUID planId = UUID.randomUUID();
+
+        InstallmentPlan plan = InstallmentPlan.builder()
+                .id(planId)
+                .owner(user)
+                .description("MacBook Pro 14")
+                .totalAmount(new BigDecimal("18000.00"))
+                .installmentAmount(new BigDecimal("1500.00"))
+                .totalInstallments(12)
+                .status(InstallmentStatus.ACTIVE)
+                .firstDueDate(LocalDate.of(2026, 7, 1))
+                .build();
+
+        doReturn(Optional.of(plan)).when(repository).findByOwnerIdAndId(user.getId(), planId);
+
+        InstallmentPlan result = service.findById(user, planId);
+
+        assertEquals(plan, result);
+        verify(repository, times(1)).findByOwnerIdAndId(user.getId(), planId);
+    }
+
+    @Test
+    @DisplayName("Should throw NotFoundException when plan does not belong to user")
+    void findById_WhenPlanNotFound_ShouldThrowNotFoundException() {
+        User user = User.builder()
+                .id(UUID.randomUUID())
+                .name("Anderson")
+                .email("anderson@gmail.com")
+                .password("password")
+                .role(UserRole.ROLE_USER)
+                .build();
+
+        UUID planId = UUID.randomUUID();
+
+        doReturn(Optional.empty()).when(repository).findByOwnerIdAndId(user.getId(), planId);
+
+        assertThrows(NotFoundException.class, () -> service.findById(user, planId));
+    }
+
+    // --- findAll() ---
+
+    @Test
+    @DisplayName("Should return page with plans when user has plans")
+    void findAll_WhenPlansExist_ShouldReturnPage() {
+        User user = User.builder()
+                .id(UUID.randomUUID())
+                .name("Anderson")
+                .email("anderson@gmail.com")
+                .password("password")
+                .role(UserRole.ROLE_USER)
+                .build();
+
+        Pageable pageable = PageRequest.of(0, 10);
+
+        InstallmentPlan plan = InstallmentPlan.builder()
+                .id(UUID.randomUUID())
+                .owner(user)
+                .description("MacBook Pro 14")
+                .totalAmount(new BigDecimal("18000.00"))
+                .installmentAmount(new BigDecimal("1500.00"))
+                .totalInstallments(12)
+                .status(InstallmentStatus.ACTIVE)
+                .firstDueDate(LocalDate.of(2026, 7, 1))
+                .build();
+
+        Page<InstallmentPlan> expectedPage = new PageImpl<>(List.of(plan), pageable, 1);
+
+        doReturn(expectedPage).when(repository).findByOwnerId(user.getId(), pageable);
+
+        Page<InstallmentPlan> result = service.findAll(user, pageable);
+
+        assertEquals(1, result.getTotalElements());
+        assertEquals(plan, result.getContent().get(0));
+        verify(repository, times(1)).findByOwnerId(user.getId(), pageable);
+    }
+
+    @Test
+    @DisplayName("Should return empty page when user has no plans")
+    void findAll_WhenNoPlansExist_ShouldReturnEmptyPage() {
+        User user = User.builder()
+                .id(UUID.randomUUID())
+                .name("Anderson")
+                .email("anderson@gmail.com")
+                .password("password")
+                .role(UserRole.ROLE_USER)
+                .build();
+
+        Pageable pageable = PageRequest.of(0, 10);
+        Page<InstallmentPlan> emptyPage = new PageImpl<>(List.of(), pageable, 0);
+
+        doReturn(emptyPage).when(repository).findByOwnerId(user.getId(), pageable);
+
+        Page<InstallmentPlan> result = service.findAll(user, pageable);
+
+        assertEquals(0, result.getTotalElements());
+        verify(repository, times(1)).findByOwnerId(user.getId(), pageable);
+    }
+
+    // --- cancel() ---
+
+    @Test
+    @DisplayName("Should cancel plan and delete all associated expenses when plan is active")
+    void cancel_WhenPlanIsActive_ShouldCancelAndDeleteExpenses() {
+        User user = User.builder()
+                .id(UUID.randomUUID())
+                .name("Anderson")
+                .email("anderson@gmail.com")
+                .password("password")
+                .role(UserRole.ROLE_USER)
+                .build();
+
+        UUID planId = UUID.randomUUID();
+
+        InstallmentPlan plan = InstallmentPlan.builder()
+                .id(planId)
+                .owner(user)
+                .description("MacBook Pro 14")
+                .totalAmount(new BigDecimal("18000.00"))
+                .installmentAmount(new BigDecimal("1500.00"))
+                .totalInstallments(12)
+                .status(InstallmentStatus.ACTIVE)
+                .firstDueDate(LocalDate.of(2026, 7, 1))
+                .build();
+
+        doReturn(Optional.of(plan)).when(repository).findByOwnerIdAndId(user.getId(), planId);
+        doNothing().when(expenseService).deleteByInstallmentPlan(planId);
+        doReturn(plan).when(repository).save(plan);
+
+        service.cancel(user, planId);
+
+        assertEquals(InstallmentStatus.CANCELLED, plan.getStatus());
+        verify(expenseService, times(1)).deleteByInstallmentPlan(planId);
+        verify(repository, times(1)).save(plan);
+    }
+
+    @Test
+    @DisplayName("Should throw OperationNotAllowedException when plan is already cancelled")
+    void cancel_WhenPlanIsAlreadyCancelled_ShouldThrowOperationNotAllowedException() {
+        User user = User.builder()
+                .id(UUID.randomUUID())
+                .name("Anderson")
+                .email("anderson@gmail.com")
+                .password("password")
+                .role(UserRole.ROLE_USER)
+                .build();
+
+        UUID planId = UUID.randomUUID();
+
+        InstallmentPlan plan = InstallmentPlan.builder()
+                .id(planId)
+                .owner(user)
+                .description("MacBook Pro 14")
+                .totalAmount(new BigDecimal("18000.00"))
+                .installmentAmount(new BigDecimal("1500.00"))
+                .totalInstallments(12)
+                .status(InstallmentStatus.CANCELLED)
+                .firstDueDate(LocalDate.of(2026, 7, 1))
+                .build();
+
+        doReturn(Optional.of(plan)).when(repository).findByOwnerIdAndId(user.getId(), planId);
+
+        assertThrows(OperationNotAllowedException.class, () -> service.cancel(user, planId));
+
+        verify(expenseService, never()).deleteByInstallmentPlan(any());
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Should throw NotFoundException when cancelling a plan that does not exist")
+    void cancel_WhenPlanNotFound_ShouldThrowNotFoundException() {
+        User user = User.builder()
+                .id(UUID.randomUUID())
+                .name("Anderson")
+                .email("anderson@gmail.com")
+                .password("password")
+                .role(UserRole.ROLE_USER)
+                .build();
+
+        UUID planId = UUID.randomUUID();
+
+        doReturn(Optional.empty()).when(repository).findByOwnerIdAndId(user.getId(), planId);
+
+        assertThrows(NotFoundException.class, () -> service.cancel(user, planId));
+
+        verify(expenseService, never()).deleteByInstallmentPlan(any());
+        verify(repository, never()).save(any());
     }
 
     @Test

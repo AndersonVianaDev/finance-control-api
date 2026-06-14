@@ -5,6 +5,7 @@ import com.andersonvianadev.finance_control_api.domain.models.User;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
+import java.util.List;
 import java.util.UUID;
 
 public interface IExpenseService {
@@ -13,4 +14,6 @@ public interface IExpenseService {
     Page<Expense> findAll(User user, Pageable pageable);
     void delete(User user, UUID id);
     Expense update(Expense expense, boolean skipBudget);
+    void deleteByInstallmentPlan(UUID planId);
+    List<Expense> findByInstallmentPlan(UUID planId);
 }
