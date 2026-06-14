@@ -32,4 +32,8 @@ public class Expense extends BaseTransaction {
     private InstallmentPlan installmentPlan;
 
     private Integer installmentNumber;
+
+    public boolean isInstallments() {
+        return this.installmentPlan != null;
+    }
 }

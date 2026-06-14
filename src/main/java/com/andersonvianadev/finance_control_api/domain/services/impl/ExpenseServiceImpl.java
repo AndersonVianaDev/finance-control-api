@@ -8,6 +8,7 @@ import com.andersonvianadev.finance_control_api.domain.services.IBudgetService;
 import com.andersonvianadev.finance_control_api.domain.services.ICalendarService;
 import com.andersonvianadev.finance_control_api.domain.services.ICategoryService;
 import com.andersonvianadev.finance_control_api.domain.services.IExpenseService;
+import com.andersonvianadev.finance_control_api.infra.exceptions.DeleteNotAllowedException;
 import com.andersonvianadev.finance_control_api.infra.exceptions.NotFoundException;
 import com.andersonvianadev.finance_control_api.infra.exceptions.ResourceAlreadyExistsException;
 import com.andersonvianadev.finance_control_api.infra.repositories.ExpenseRepository;
@@ -100,5 +101,16 @@ public class ExpenseServiceImpl implements IExpenseService {
     @Override
     public Page<Expense> findAll(User user, Pageable pageable) {
         return repository.findByOwnerId(user.getId(), pageable);
+    }
+
+    @Override
+    public void delete(User owner, UUID id) {
+        Expense expense = this.findById(owner, id);
+
+        if(expense.isInstallments()) {
+            throw new DeleteNotAllowedException("The user can only cancel the entire installment plan");
+        }
+
+        repository.delete(expense);
     }
 }

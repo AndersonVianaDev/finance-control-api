@@ -9,10 +9,15 @@ import com.andersonvianadev.finance_control_api.domain.models.enums.UserRole;
 import com.andersonvianadev.finance_control_api.domain.services.IBudgetService;
 import com.andersonvianadev.finance_control_api.domain.services.ICalendarService;
 import com.andersonvianadev.finance_control_api.domain.services.ICategoryService;
+import com.andersonvianadev.finance_control_api.infra.exceptions.DeleteNotAllowedException;
 import com.andersonvianadev.finance_control_api.infra.exceptions.ExternalServiceException;
 import com.andersonvianadev.finance_control_api.infra.exceptions.NotFoundException;
 import com.andersonvianadev.finance_control_api.infra.exceptions.ResourceAlreadyExistsException;
 import com.andersonvianadev.finance_control_api.infra.repositories.ExpenseRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -24,10 +29,12 @@ import org.springframework.dao.DataIntegrityViolationException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
@@ -215,6 +222,120 @@ class ExpenseServiceImplTest {
         assertThrows(ExternalServiceException.class, () -> service.save(expense, false));
 
         verify(repository, never()).save(any());
+    }
+
+    // ── findById ─────────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("Should return expense when it exists and belongs to user")
+    void findById_WhenExpenseExists_ShouldReturnExpense() {
+        User user = buildUser();
+        Category category = buildCategory(user);
+        UUID expenseId = UUID.randomUUID();
+        Expense expense = Expense.builder().id(expenseId).owner(user).category(category).build();
+
+        doReturn(java.util.Optional.of(expense)).when(repository).findExpenseByOwnerIdAndId(user.getId(), expenseId);
+
+        Expense result = service.findById(user, expenseId);
+
+        assertEquals(expense, result);
+        verify(repository, times(1)).findExpenseByOwnerIdAndId(user.getId(), expenseId);
+    }
+
+    @Test
+    @DisplayName("Should throw NotFoundException when expense does not exist")
+    void findById_WhenExpenseDoesNotExist_ShouldThrowNotFoundException() {
+        User user = buildUser();
+        UUID expenseId = UUID.randomUUID();
+
+        doReturn(java.util.Optional.empty()).when(repository).findExpenseByOwnerIdAndId(user.getId(), expenseId);
+
+        assertThrows(NotFoundException.class, () -> service.findById(user, expenseId));
+
+        verify(repository, times(1)).findExpenseByOwnerIdAndId(user.getId(), expenseId);
+    }
+
+    // ── findAll ──────────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("Should return paginated expenses for user")
+    void findAll_WhenExpensesExist_ShouldReturnPage() {
+        User user = buildUser();
+        Category category = buildCategory(user);
+        Pageable pageable = PageRequest.of(0, 10);
+        Expense expense = Expense.builder().id(UUID.randomUUID()).owner(user).category(category).build();
+        Page<Expense> page = new PageImpl<>(List.of(expense), pageable, 1);
+
+        doReturn(page).when(repository).findByOwnerId(user.getId(), pageable);
+
+        Page<Expense> result = service.findAll(user, pageable);
+
+        assertEquals(1, result.getTotalElements());
+        assertEquals(expense, result.getContent().getFirst());
+        verify(repository, times(1)).findByOwnerId(user.getId(), pageable);
+    }
+
+    @Test
+    @DisplayName("Should return empty page when user has no expenses")
+    void findAll_WhenNoExpensesExist_ShouldReturnEmptyPage() {
+        User user = buildUser();
+        Pageable pageable = PageRequest.of(0, 10);
+        Page<Expense> page = new PageImpl<>(List.of(), pageable, 0);
+
+        doReturn(page).when(repository).findByOwnerId(user.getId(), pageable);
+
+        Page<Expense> result = service.findAll(user, pageable);
+
+        assertEquals(0, result.getTotalElements());
+        verify(repository, times(1)).findByOwnerId(user.getId(), pageable);
+    }
+
+    // ── delete ───────────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("Should delete expense successfully when it is not an installment")
+    void delete_WhenExpenseIsNotInstallment_ShouldDelete() {
+        User user = buildUser();
+        Category category = buildCategory(user);
+        UUID expenseId = UUID.randomUUID();
+        Expense expense = buildExpense(user, category.getId(), LocalDateTime.of(2026, 7, 1, 10, 0));
+        expense.setId(expenseId);
+
+        doReturn(java.util.Optional.of(expense)).when(repository).findExpenseByOwnerIdAndId(user.getId(), expenseId);
+        doNothing().when(repository).delete(expense);
+
+        service.delete(user, expenseId);
+
+        verify(repository, times(1)).delete(expense);
+    }
+
+    @Test
+    @DisplayName("Should throw DeleteNotAllowedException when expense is linked to an installment plan")
+    void delete_WhenExpenseIsInstallment_ShouldThrowDeleteNotAllowedException() {
+        User user = buildUser();
+        Category category = buildCategory(user);
+        UUID expenseId = UUID.randomUUID();
+        Expense expense = buildInstallmentExpense(user, category.getId(), LocalDateTime.of(2026, 7, 1, 0, 0));
+        expense.setId(expenseId);
+
+        doReturn(java.util.Optional.of(expense)).when(repository).findExpenseByOwnerIdAndId(user.getId(), expenseId);
+
+        assertThrows(DeleteNotAllowedException.class, () -> service.delete(user, expenseId));
+
+        verify(repository, never()).delete(any());
+    }
+
+    @Test
+    @DisplayName("Should throw NotFoundException when expense to delete does not exist")
+    void delete_WhenExpenseDoesNotExist_ShouldThrowNotFoundException() {
+        User user = buildUser();
+        UUID expenseId = UUID.randomUUID();
+
+        doReturn(java.util.Optional.empty()).when(repository).findExpenseByOwnerIdAndId(user.getId(), expenseId);
+
+        assertThrows(NotFoundException.class, () -> service.delete(user, expenseId));
+
+        verify(repository, never()).delete(any());
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────
