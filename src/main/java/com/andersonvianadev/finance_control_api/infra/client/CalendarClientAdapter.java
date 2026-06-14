@@ -34,6 +34,7 @@ public class CalendarClientAdapter implements ICalendarService {
         LocalDate nextWorkingDay = external.proximoDiaUtil() != null
                 ? LocalDate.parse(external.proximoDiaUtil())
                 : null;
-        return new CalendarDTO(date, external.diaUtilBancario(), external.motivo(), nextWorkingDay);
+        boolean isWorkingDay = Boolean.TRUE.equals(external.diaUtilBancario());
+        return new CalendarDTO(date, isWorkingDay, external.motivo(), nextWorkingDay);
     }
 }

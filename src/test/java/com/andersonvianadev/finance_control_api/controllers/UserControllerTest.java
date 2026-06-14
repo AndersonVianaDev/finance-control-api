@@ -7,7 +7,12 @@ import com.andersonvianadev.finance_control_api.domain.models.User;
 import com.andersonvianadev.finance_control_api.domain.models.enums.UserRole;
 import com.andersonvianadev.finance_control_api.domain.services.IUserService;
 import com.andersonvianadev.finance_control_api.infra.exceptions.StandardException;
+import com.andersonvianadev.finance_control_api.infra.repositories.BudgetRepository;
 import com.andersonvianadev.finance_control_api.infra.repositories.CategoryRepository;
+import com.andersonvianadev.finance_control_api.infra.repositories.ExpenseRepository;
+import com.andersonvianadev.finance_control_api.infra.repositories.IncomeRepository;
+import com.andersonvianadev.finance_control_api.infra.repositories.InstallmentPlanRepository;
+import com.andersonvianadev.finance_control_api.infra.repositories.RecurringRuleRepository;
 import com.andersonvianadev.finance_control_api.infra.repositories.UserRepository;
 import com.andersonvianadev.finance_control_api.infra.security.UserPrincipal;
 import org.junit.jupiter.api.*;
@@ -47,8 +52,28 @@ class UserControllerTest {
     @Autowired
     private CategoryRepository categoryRepository;
 
+    @Autowired
+    private ExpenseRepository expenseRepository;
+
+    @Autowired
+    private IncomeRepository incomeRepository;
+
+    @Autowired
+    private BudgetRepository budgetRepository;
+
+    @Autowired
+    private InstallmentPlanRepository installmentPlanRepository;
+
+    @Autowired
+    private RecurringRuleRepository recurringRuleRepository;
+
     @BeforeEach
     void setup() {
+        incomeRepository.deleteAll();
+        expenseRepository.deleteAll();
+        installmentPlanRepository.deleteAll();
+        budgetRepository.deleteAll();
+        recurringRuleRepository.deleteAll();
         categoryRepository.deleteAll();
         repository.deleteAll();
     }

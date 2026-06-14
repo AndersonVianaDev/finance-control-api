@@ -10,10 +10,17 @@ import java.time.LocalDate;
 import java.util.UUID;
 
 public record InstallmentPlanRequestDTO(
-        @NotNull @Positive BigDecimal totalAmount,
-        @NotNull @Min(2) Integer totalInstallments,
-        @NotNull LocalDate firstDueDate,
-        @NotBlank String description,
-        @NotNull UUID categoryId
+        @NotNull(message = "total amount field cannot be null.")
+        @Positive(message = "the total amount must be positive.")
+        BigDecimal totalAmount,
+        @NotNull(message = "total installments field cannot be null.")
+        @Min(value = 2, message = "minimum 2 installments required.")
+        Integer totalInstallments,
+        @NotNull(message = "first due date field cannot be null.")
+        LocalDate firstDueDate,
+        @NotBlank(message = "description field cannot be blank.")
+        String description,
+        @NotNull(message = "category field cannot be null.")
+        UUID categoryId
 ) {
 }
