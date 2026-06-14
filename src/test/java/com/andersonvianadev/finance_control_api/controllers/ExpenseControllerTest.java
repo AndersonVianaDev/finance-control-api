@@ -2,6 +2,8 @@ package com.andersonvianadev.finance_control_api.controllers;
 
 import com.andersonvianadev.finance_control_api.controllers.dtos.requests.ExpenseRequestDTO;
 import com.andersonvianadev.finance_control_api.controllers.dtos.responses.ExpenseResponseDTO;
+import com.andersonvianadev.finance_control_api.controllers.dtos.responses.PageResponseDTO;
+import tools.jackson.databind.JavaType;
 import com.andersonvianadev.finance_control_api.domain.models.Budget;
 import com.andersonvianadev.finance_control_api.domain.models.Category;
 import com.andersonvianadev.finance_control_api.domain.models.User;
@@ -41,8 +43,10 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 
 @SpringBootTest
@@ -419,6 +423,166 @@ class ExpenseControllerTest {
     @DisplayName("Should return 403 when request is unauthenticated")
     void findById_WhenUnauthenticated_ShouldReturnForbidden() throws Exception {
         mockMvc.perform(MockMvcRequestBuilders.get("/expenses/{id}", UUID.randomUUID()))
+                .andExpect(MockMvcResultMatchers.status().isForbidden())
+                .andDo(MockMvcResultHandlers.print());
+    }
+
+    // ── findAll ──────────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("Should return paginated expenses for authenticated user")
+    void findAll_WhenUserHasExpenses_ShouldReturnPaginatedResults() throws Exception {
+        User user = createUser("anderson@gmail.com");
+        Category category = createCategory(user);
+        UserPrincipal principal = new UserPrincipal(user);
+
+        for (int i = 1; i <= 3; i++) {
+            mockMvc.perform(MockMvcRequestBuilders.post("/expenses")
+                            .with(user(principal))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(new ExpenseRequestDTO(
+                                    LocalDateTime.of(2026, 7, i, 10, 0),
+                                    new BigDecimal("100.00"),
+                                    "Expense " + i,
+                                    category.getId()
+                            ))))
+                    .andExpect(MockMvcResultMatchers.status().isCreated());
+        }
+
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.get("/expenses")
+                        .with(user(principal))
+                        .param("page", "0")
+                        .param("size", "10"))
+                .andExpect(MockMvcResultMatchers.status().isOk())
+                .andDo(MockMvcResultHandlers.print())
+                .andReturn();
+
+        JavaType pageType = objectMapper.getTypeFactory()
+                .constructParametricType(PageResponseDTO.class, ExpenseResponseDTO.class);
+        PageResponseDTO<ExpenseResponseDTO> response = objectMapper.readValue(
+                result.getResponse().getContentAsString(), pageType);
+
+        assertEquals(3, response.totalElement());
+        assertEquals(3, response.content().size());
+        assertEquals(0, response.page());
+        assertEquals(1, response.totalPages());
+        assertTrue(response.last());
+    }
+
+    @Test
+    @DisplayName("Should return empty page when user has no expenses")
+    void findAll_WhenUserHasNoExpenses_ShouldReturnEmptyPage() throws Exception {
+        User user = createUser("anderson@gmail.com");
+        UserPrincipal principal = new UserPrincipal(user);
+
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.get("/expenses")
+                        .with(user(principal)))
+                .andExpect(MockMvcResultMatchers.status().isOk())
+                .andDo(MockMvcResultHandlers.print())
+                .andReturn();
+
+        JavaType pageType = objectMapper.getTypeFactory()
+                .constructParametricType(PageResponseDTO.class, ExpenseResponseDTO.class);
+        PageResponseDTO<ExpenseResponseDTO> response = objectMapper.readValue(
+                result.getResponse().getContentAsString(), pageType);
+
+        assertEquals(0, response.totalElement());
+        assertTrue(response.content().isEmpty());
+        assertTrue(response.last());
+    }
+
+    @Test
+    @DisplayName("Should respect page size and return correct page")
+    void findAll_WhenPageSizeIsApplied_ShouldReturnCorrectPage() throws Exception {
+        User user = createUser("anderson@gmail.com");
+        Category category = createCategory(user);
+        UserPrincipal principal = new UserPrincipal(user);
+
+        for (int i = 1; i <= 3; i++) {
+            mockMvc.perform(MockMvcRequestBuilders.post("/expenses")
+                            .with(user(principal))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(new ExpenseRequestDTO(
+                                    LocalDateTime.of(2026, 7, i, 10, 0),
+                                    new BigDecimal("100.00"),
+                                    "Expense " + i,
+                                    category.getId()
+                            ))))
+                    .andExpect(MockMvcResultMatchers.status().isCreated());
+        }
+
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.get("/expenses")
+                        .with(user(principal))
+                        .param("page", "0")
+                        .param("size", "2"))
+                .andExpect(MockMvcResultMatchers.status().isOk())
+                .andDo(MockMvcResultHandlers.print())
+                .andReturn();
+
+        JavaType pageType = objectMapper.getTypeFactory()
+                .constructParametricType(PageResponseDTO.class, ExpenseResponseDTO.class);
+        PageResponseDTO<ExpenseResponseDTO> response = objectMapper.readValue(
+                result.getResponse().getContentAsString(), pageType);
+
+        assertEquals(3, response.totalElement());
+        assertEquals(2, response.content().size());
+        assertEquals(2, response.totalPages());
+        assertFalse(response.last());
+    }
+
+    @Test
+    @DisplayName("Should return only expenses of the authenticated user")
+    void findAll_ShouldOnlyReturnExpensesOfAuthenticatedUser() throws Exception {
+        User owner = createUser("anderson@gmail.com");
+        User other = createUser("other@gmail.com");
+        Category ownerCategory = createCategory(owner);
+        Category otherCategory = createCategory(other);
+        UserPrincipal ownerPrincipal = new UserPrincipal(owner);
+        UserPrincipal otherPrincipal = new UserPrincipal(other);
+
+        for (int i = 1; i <= 2; i++) {
+            mockMvc.perform(MockMvcRequestBuilders.post("/expenses")
+                            .with(user(ownerPrincipal))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(new ExpenseRequestDTO(
+                                    LocalDateTime.of(2026, 7, i, 10, 0),
+                                    new BigDecimal("100.00"),
+                                    "Owner expense " + i,
+                                    ownerCategory.getId()
+                            ))))
+                    .andExpect(MockMvcResultMatchers.status().isCreated());
+        }
+
+        mockMvc.perform(MockMvcRequestBuilders.post("/expenses")
+                        .with(user(otherPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new ExpenseRequestDTO(
+                                LocalDateTime.of(2026, 7, 5, 10, 0),
+                                new BigDecimal("200.00"),
+                                "Other user expense",
+                                otherCategory.getId()
+                        ))))
+                .andExpect(MockMvcResultMatchers.status().isCreated());
+
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.get("/expenses")
+                        .with(user(ownerPrincipal)))
+                .andExpect(MockMvcResultMatchers.status().isOk())
+                .andDo(MockMvcResultHandlers.print())
+                .andReturn();
+
+        JavaType pageType = objectMapper.getTypeFactory()
+                .constructParametricType(PageResponseDTO.class, ExpenseResponseDTO.class);
+        PageResponseDTO<ExpenseResponseDTO> response = objectMapper.readValue(
+                result.getResponse().getContentAsString(), pageType);
+
+        assertEquals(2, response.totalElement());
+        assertEquals(2, response.content().size());
+    }
+
+    @Test
+    @DisplayName("Should return 403 when findAll request is unauthenticated")
+    void findAll_WhenUnauthenticated_ShouldReturnForbidden() throws Exception {
+        mockMvc.perform(MockMvcRequestBuilders.get("/expenses"))
                 .andExpect(MockMvcResultMatchers.status().isForbidden())
                 .andDo(MockMvcResultHandlers.print());
     }
