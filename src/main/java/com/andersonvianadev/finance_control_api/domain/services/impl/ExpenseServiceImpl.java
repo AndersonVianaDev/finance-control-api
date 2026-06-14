@@ -14,6 +14,8 @@ import com.andersonvianadev.finance_control_api.infra.repositories.ExpenseReposi
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -93,5 +95,10 @@ public class ExpenseServiceImpl implements IExpenseService {
     public Expense findById(User user, UUID id) {
         return repository.findExpenseByOwnerIdAndId(user.getId(), id)
                 .orElseThrow(() -> new NotFoundException(String.format("Expense with id %s not found", id.toString())));
+    }
+
+    @Override
+    public Page<Expense> findAll(User user, Pageable pageable) {
+        return repository.findByOwnerId(user.getId(), pageable);
     }
 }
