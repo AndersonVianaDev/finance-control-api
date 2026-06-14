@@ -8,10 +8,11 @@ import com.andersonvianadev.finance_control_api.domain.services.IBudgetService;
 import com.andersonvianadev.finance_control_api.domain.services.ICalendarService;
 import com.andersonvianadev.finance_control_api.domain.services.ICategoryService;
 import com.andersonvianadev.finance_control_api.domain.services.IExpenseService;
-import com.andersonvianadev.finance_control_api.infra.exceptions.DeleteNotAllowedException;
+import com.andersonvianadev.finance_control_api.infra.exceptions.OperationNotAllowedException;
 import com.andersonvianadev.finance_control_api.infra.exceptions.NotFoundException;
 import com.andersonvianadev.finance_control_api.infra.exceptions.ResourceAlreadyExistsException;
 import com.andersonvianadev.finance_control_api.infra.repositories.ExpenseRepository;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -19,6 +20,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -108,9 +110,81 @@ public class ExpenseServiceImpl implements IExpenseService {
         Expense expense = this.findById(owner, id);
 
         if(expense.isInstallments()) {
-            throw new DeleteNotAllowedException("The user can only cancel the entire installment plan");
+            throw new OperationNotAllowedException("The user can only cancel the entire installment plan");
         }
 
         repository.delete(expense);
+    }
+
+    @Override
+    @Transactional
+    public Expense update(Expense expense, boolean skipBudget) {
+        User owner = expense.getOwner();
+
+        Expense expenseSaved = this.findById(owner, expense.getId());
+
+        if(expenseSaved.isInstallments()) {
+            throw new OperationNotAllowedException("The user can only update the installment plan in full.");
+        }
+
+        BigDecimal oldPrice = expenseSaved.getPrice();
+
+        Category incomingCategory = expense.getCategory();
+        Category resolvedCategory = expenseSaved.getCategory();
+        boolean categoryChanged = false;
+
+        if(incomingCategory != null && incomingCategory.getId() != null) {
+            resolvedCategory = categoryService.findByIdAndOwnerOrOwnerIsNull(incomingCategory.getId(), owner);
+            categoryChanged = true;
+        }
+
+        BigDecimal projectedPrice = (expense.getPrice() != null && !expense.getPrice().equals(oldPrice))
+                ? expense.getPrice() : oldPrice;
+        String projectedDescription = (expense.getDescription() != null && !expense.getDescription().equals(expenseSaved.getDescription()))
+                ? expense.getDescription() : expenseSaved.getDescription();
+        LocalDateTime projectedDate = (expense.getTransactionDate() != null && !expense.getTransactionDate().equals(expenseSaved.getTransactionDate()))
+                ? expense.getTransactionDate() : expenseSaved.getTransactionDate();
+
+        boolean exists = repository.existsDuplicateExcluding(
+                owner.getId(),
+                resolvedCategory.getId(),
+                projectedPrice,
+                projectedDate,
+                projectedDescription,
+                expenseSaved.getId()
+        );
+
+        if(exists) {
+            throw new ResourceAlreadyExistsException("Expense already registered");
+        }
+
+        boolean priceChanged = !projectedPrice.equals(oldPrice);
+
+        if(!skipBudget) {
+            if(categoryChanged) {
+                budgetService.validateTransactionRespectsBudget(owner, resolvedCategory, projectedPrice);
+            } else if(priceChanged) {
+                budgetService.validateTransactionRespectsBudgetOnUpdate(owner, expenseSaved.getCategory(), oldPrice, projectedPrice);
+            }
+        }
+
+        if(categoryChanged) expenseSaved.setCategory(resolvedCategory);
+        if(priceChanged) expenseSaved.setPrice(projectedPrice);
+        if(!projectedDescription.equals(expenseSaved.getDescription())) expenseSaved.setDescription(projectedDescription);
+        if(!projectedDate.equals(expenseSaved.getTransactionDate())) expenseSaved.setTransactionDate(projectedDate);
+
+        try {
+            return repository.save(expenseSaved);
+        } catch (DataIntegrityViolationException e) {
+            log.error(
+                    "Database constraint violation while updating expense. owner={}, category={}, date={}, price={}",
+                    owner.getEmail(),
+                    expenseSaved.getCategory().getName(),
+                    expenseSaved.getTransactionDate(),
+                    expenseSaved.getPrice(),
+                    e
+            );
+            throw new ResourceAlreadyExistsException("Expense already registered");
+        }
     }
 }

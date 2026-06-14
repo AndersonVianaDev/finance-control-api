@@ -16,4 +16,5 @@ public interface IBudgetService {
     void delete(User owner, UUID id);
     Page<Budget> findAll(User owner, Pageable pageable);
     void validateTransactionRespectsBudget(User owner, Category category, BigDecimal valueTransaction);
+    void validateTransactionRespectsBudgetOnUpdate(User owner, Category category, BigDecimal oldPrice, BigDecimal newPrice);
 }
