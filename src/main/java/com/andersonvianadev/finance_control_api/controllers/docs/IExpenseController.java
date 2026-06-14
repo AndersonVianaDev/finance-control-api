@@ -373,4 +373,85 @@ public interface IExpenseController {
             @AuthenticationPrincipal(expression = "user") User user,
             @PageableDefault(size = 10) Pageable pageable
     );
+
+    @Operation(
+            summary = "Delete expense by ID",
+            description = """
+                    Permanently deletes an expense by its ID.
+
+                    The expense must belong to the authenticated user.
+                    Expenses linked to an installment plan cannot be deleted individually — cancel the entire plan instead.
+                    """,
+            security = @SecurityRequirement(name = "bearerAuth"),
+            responses = {
+                    @ApiResponse(
+                            responseCode = "204",
+                            description = "Expense deleted successfully.",
+                            content = @Content
+                    ),
+                    @ApiResponse(
+                            responseCode = "422",
+                            description = "Expense is linked to an installment plan and cannot be deleted individually.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = StandardException.class),
+                                    examples = @ExampleObject(
+                                            name = "Installment expense deletion blocked.",
+                                            value = """
+                                                    {
+                                                        "timestamp": "2026-06-07T09:00:00Z",
+                                                        "status": 422,
+                                                        "error": "The user can only cancel the entire installment plan",
+                                                        "path": "/nix-finance-api/expenses/{id}"
+                                                    }
+                                                    """
+                                    )
+                            )
+                    ),
+                    @ApiResponse(
+                            responseCode = "404",
+                            description = "Expense not found or does not belong to the authenticated user.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = StandardException.class),
+                                    examples = @ExampleObject(
+                                            name = "Expense not found.",
+                                            value = """
+                                                    {
+                                                        "timestamp": "2026-06-07T09:00:00Z",
+                                                        "status": 404,
+                                                        "error": "Expense not found.",
+                                                        "path": "/nix-finance-api/expenses/{id}"
+                                                    }
+                                                    """
+                                    )
+                            )
+                    ),
+                    @ApiResponse(
+                            responseCode = "401",
+                            description = "Unauthorized. Missing or invalid JWT token.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = StandardException.class),
+                                    examples = @ExampleObject(
+                                            name = "Missing or invalid token.",
+                                            value = """
+                                                    {
+                                                        "timestamp": "2026-06-07T09:00:00Z",
+                                                        "status": 401,
+                                                        "error": "Unauthorized",
+                                                        "path": "/nix-finance-api/expenses/{id}"
+                                                    }
+                                                    """
+                                    )
+                            )
+                    )
+            }
+    )
+    ResponseEntity<Void> delete(
+            @Parameter(hidden = true)
+            @AuthenticationPrincipal(expression = "user") User user,
+            @Parameter(description = "Expense UUID.", required = true)
+            @PathVariable UUID id
+    );
 }
