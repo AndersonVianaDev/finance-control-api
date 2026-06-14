@@ -66,8 +66,8 @@ public class ErrorHandler {
         return ResponseEntity.status(exception.status()).body(exception);
     }
 
-    @ExceptionHandler(DeleteNotAllowedException.class)
-    public ResponseEntity<StandardException> deleteNotAllowedException(DeleteNotAllowedException e, HttpServletRequest request) {
+    @ExceptionHandler(OperationNotAllowedException.class)
+    public ResponseEntity<StandardException> deleteNotAllowedException(OperationNotAllowedException e, HttpServletRequest request) {
         StandardException exception = new StandardException(Instant.now(), HttpStatus.UNPROCESSABLE_ENTITY.value(), e.getMessage(), request.getRequestURI());
         return ResponseEntity.status(exception.status()).body(exception);
     }

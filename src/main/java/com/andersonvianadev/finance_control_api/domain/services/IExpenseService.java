@@ -12,4 +12,5 @@ public interface IExpenseService {
     Expense findById(User user, UUID id);
     Page<Expense> findAll(User user, Pageable pageable);
     void delete(User user, UUID id);
+    Expense update(Expense expense, boolean skipBudget);
 }

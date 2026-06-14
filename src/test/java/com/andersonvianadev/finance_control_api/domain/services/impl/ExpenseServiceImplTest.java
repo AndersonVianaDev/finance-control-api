@@ -9,7 +9,7 @@ import com.andersonvianadev.finance_control_api.domain.models.enums.UserRole;
 import com.andersonvianadev.finance_control_api.domain.services.IBudgetService;
 import com.andersonvianadev.finance_control_api.domain.services.ICalendarService;
 import com.andersonvianadev.finance_control_api.domain.services.ICategoryService;
-import com.andersonvianadev.finance_control_api.infra.exceptions.DeleteNotAllowedException;
+import com.andersonvianadev.finance_control_api.infra.exceptions.OperationNotAllowedException;
 import com.andersonvianadev.finance_control_api.infra.exceptions.ExternalServiceException;
 import com.andersonvianadev.finance_control_api.infra.exceptions.NotFoundException;
 import com.andersonvianadev.finance_control_api.infra.exceptions.ResourceAlreadyExistsException;
@@ -320,7 +320,7 @@ class ExpenseServiceImplTest {
 
         doReturn(java.util.Optional.of(expense)).when(repository).findExpenseByOwnerIdAndId(user.getId(), expenseId);
 
-        assertThrows(DeleteNotAllowedException.class, () -> service.delete(user, expenseId));
+        assertThrows(OperationNotAllowedException.class, () -> service.delete(user, expenseId));
 
         verify(repository, never()).delete(any());
     }
@@ -336,6 +336,287 @@ class ExpenseServiceImplTest {
         assertThrows(NotFoundException.class, () -> service.delete(user, expenseId));
 
         verify(repository, never()).delete(any());
+    }
+
+    // ── update ───────────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("Should call validateTransactionRespectsBudgetOnUpdate with old and new price when price increases and skipBudget is false")
+    void update_WhenPriceIncreasedAndSkipBudgetIsFalse_ShouldCallValidateOnUpdateAndSave() {
+        User user = buildUser();
+        Category category = buildCategory(user);
+        UUID expenseId = UUID.randomUUID();
+        LocalDateTime date = LocalDateTime.of(2026, 7, 1, 10, 0);
+
+        Expense existing = Expense.builder()
+                .id(expenseId).owner(user).category(category)
+                .price(new BigDecimal("100.00")).description("Old desc")
+                .transactionDate(date).build();
+
+        Expense input = Expense.builder()
+                .id(expenseId).owner(user)
+                .price(new BigDecimal("200.00"))
+                .category(Category.builder().id(null).build())
+                .build();
+
+        doReturn(java.util.Optional.of(existing)).when(repository).findExpenseByOwnerIdAndId(user.getId(), expenseId);
+        doReturn(false).when(repository).existsDuplicateExcluding(
+                user.getId(), category.getId(), new BigDecimal("200.00"), date, "Old desc", expenseId);
+        doReturn(existing).when(repository).save(existing);
+
+        Expense result = service.update(input, false);
+
+        verify(budgetService, never()).validateTransactionRespectsBudget(any(), any(), any());
+        verify(budgetService, times(1)).validateTransactionRespectsBudgetOnUpdate(
+                user, category, new BigDecimal("100.00"), new BigDecimal("200.00"));
+        verify(repository, times(1)).save(existing);
+        assertEquals(existing, result);
+    }
+
+    @Test
+    @DisplayName("Should call validateTransactionRespectsBudgetOnUpdate even when price decreases so the service handles the math")
+    void update_WhenPriceDecreasedAndSkipBudgetIsFalse_ShouldCallValidateOnUpdateWithCorrectArgs() {
+        User user = buildUser();
+        Category category = buildCategory(user);
+        UUID expenseId = UUID.randomUUID();
+        LocalDateTime date = LocalDateTime.of(2026, 7, 1, 10, 0);
+
+        Expense existing = Expense.builder()
+                .id(expenseId).owner(user).category(category)
+                .price(new BigDecimal("200.00")).description("Old desc")
+                .transactionDate(date).build();
+
+        Expense input = Expense.builder()
+                .id(expenseId).owner(user)
+                .price(new BigDecimal("100.00"))
+                .category(Category.builder().id(null).build())
+                .build();
+
+        doReturn(java.util.Optional.of(existing)).when(repository).findExpenseByOwnerIdAndId(user.getId(), expenseId);
+        doReturn(false).when(repository).existsDuplicateExcluding(
+                user.getId(), category.getId(), new BigDecimal("100.00"), date, "Old desc", expenseId);
+        doReturn(existing).when(repository).save(existing);
+
+        service.update(input, false);
+
+        verify(budgetService, never()).validateTransactionRespectsBudget(any(), any(), any());
+        verify(budgetService, times(1)).validateTransactionRespectsBudgetOnUpdate(
+                user, category, new BigDecimal("200.00"), new BigDecimal("100.00"));
+    }
+
+    @Test
+    @DisplayName("Should validate full price on new category when category changes")
+    void update_WhenCategoryChangedAndSkipBudgetIsFalse_ShouldValidateFullPriceOnNewCategory() {
+        User user = buildUser();
+        Category oldCategory = buildCategory(user);
+        Category newCategory = Category.builder().id(UUID.randomUUID()).name("Tech").owner(user).build();
+        UUID expenseId = UUID.randomUUID();
+        LocalDateTime date = LocalDateTime.of(2026, 7, 1, 10, 0);
+
+        Expense existing = Expense.builder()
+                .id(expenseId).owner(user).category(oldCategory)
+                .price(new BigDecimal("150.00")).description("Old desc")
+                .transactionDate(date).build();
+
+        Expense input = Expense.builder()
+                .id(expenseId).owner(user)
+                .category(Category.builder().id(newCategory.getId()).build())
+                .build();
+
+        doReturn(java.util.Optional.of(existing)).when(repository).findExpenseByOwnerIdAndId(user.getId(), expenseId);
+        doReturn(newCategory).when(categoryService).findByIdAndOwnerOrOwnerIsNull(newCategory.getId(), user);
+        doReturn(false).when(repository).existsDuplicateExcluding(
+                user.getId(), newCategory.getId(), new BigDecimal("150.00"), date, "Old desc", expenseId);
+        doReturn(existing).when(repository).save(existing);
+
+        service.update(input, false);
+
+        verify(budgetService, times(1)).validateTransactionRespectsBudget(user, newCategory, new BigDecimal("150.00"));
+    }
+
+    @Test
+    @DisplayName("Should not validate budget when only description changes")
+    void update_WhenOnlyDescriptionChangedAndSkipBudgetIsFalse_ShouldNotValidateBudget() {
+        User user = buildUser();
+        Category category = buildCategory(user);
+        UUID expenseId = UUID.randomUUID();
+        LocalDateTime date = LocalDateTime.of(2026, 7, 1, 10, 0);
+
+        Expense existing = Expense.builder()
+                .id(expenseId).owner(user).category(category)
+                .price(new BigDecimal("100.00")).description("Old desc")
+                .transactionDate(date).build();
+
+        Expense input = Expense.builder()
+                .id(expenseId).owner(user)
+                .description("New desc")
+                .category(Category.builder().id(null).build())
+                .build();
+
+        doReturn(java.util.Optional.of(existing)).when(repository).findExpenseByOwnerIdAndId(user.getId(), expenseId);
+        doReturn(false).when(repository).existsDuplicateExcluding(
+                user.getId(), category.getId(), new BigDecimal("100.00"), date, "New desc", expenseId);
+        doReturn(existing).when(repository).save(existing);
+
+        service.update(input, false);
+
+        verify(budgetService, never()).validateTransactionRespectsBudget(any(), any(), any());
+        verify(budgetService, never()).validateTransactionRespectsBudgetOnUpdate(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("Should not validate budget when skipBudget is true even if price increases")
+    void update_WhenSkipBudgetIsTrue_ShouldNotValidateBudget() {
+        User user = buildUser();
+        Category category = buildCategory(user);
+        UUID expenseId = UUID.randomUUID();
+        LocalDateTime date = LocalDateTime.of(2026, 7, 1, 10, 0);
+
+        Expense existing = Expense.builder()
+                .id(expenseId).owner(user).category(category)
+                .price(new BigDecimal("100.00")).description("Old desc")
+                .transactionDate(date).build();
+
+        Expense input = Expense.builder()
+                .id(expenseId).owner(user)
+                .price(new BigDecimal("500.00"))
+                .category(Category.builder().id(null).build())
+                .build();
+
+        doReturn(java.util.Optional.of(existing)).when(repository).findExpenseByOwnerIdAndId(user.getId(), expenseId);
+        doReturn(false).when(repository).existsDuplicateExcluding(
+                user.getId(), category.getId(), new BigDecimal("500.00"), date, "Old desc", expenseId);
+        doReturn(existing).when(repository).save(existing);
+
+        service.update(input, true);
+
+        verify(budgetService, never()).validateTransactionRespectsBudget(any(), any(), any());
+        verify(budgetService, never()).validateTransactionRespectsBudgetOnUpdate(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("Should throw NotFoundException when expense to update does not exist")
+    void update_WhenExpenseNotFound_ShouldThrowNotFoundException() {
+        User user = buildUser();
+        UUID expenseId = UUID.randomUUID();
+
+        Expense input = Expense.builder()
+                .id(expenseId).owner(user)
+                .category(Category.builder().id(null).build())
+                .build();
+
+        doReturn(java.util.Optional.empty()).when(repository).findExpenseByOwnerIdAndId(user.getId(), expenseId);
+
+        assertThrows(NotFoundException.class, () -> service.update(input, false));
+
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Should throw OperationNotAllowedException when expense is linked to an installment plan")
+    void update_WhenExpenseIsInstallment_ShouldThrowOperationNotAllowedException() {
+        User user = buildUser();
+        Category category = buildCategory(user);
+        UUID expenseId = UUID.randomUUID();
+
+        Expense existing = buildInstallmentExpense(user, category.getId(), LocalDateTime.of(2026, 7, 1, 0, 0));
+        existing.setId(expenseId);
+
+        Expense input = Expense.builder()
+                .id(expenseId).owner(user)
+                .description("New desc")
+                .category(Category.builder().id(null).build())
+                .build();
+
+        doReturn(java.util.Optional.of(existing)).when(repository).findExpenseByOwnerIdAndId(user.getId(), expenseId);
+
+        assertThrows(OperationNotAllowedException.class, () -> service.update(input, false));
+
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Should throw NotFoundException when new category does not exist")
+    void update_WhenNewCategoryNotFound_ShouldThrowNotFoundException() {
+        User user = buildUser();
+        Category category = buildCategory(user);
+        UUID expenseId = UUID.randomUUID();
+        UUID newCategoryId = UUID.randomUUID();
+
+        Expense existing = Expense.builder()
+                .id(expenseId).owner(user).category(category)
+                .price(new BigDecimal("100.00")).description("Old desc")
+                .transactionDate(LocalDateTime.of(2026, 7, 1, 10, 0)).build();
+
+        Expense input = Expense.builder()
+                .id(expenseId).owner(user)
+                .category(Category.builder().id(newCategoryId).build())
+                .build();
+
+        doReturn(java.util.Optional.of(existing)).when(repository).findExpenseByOwnerIdAndId(user.getId(), expenseId);
+        doThrow(new NotFoundException("Category not found."))
+                .when(categoryService).findByIdAndOwnerOrOwnerIsNull(newCategoryId, user);
+
+        assertThrows(NotFoundException.class, () -> service.update(input, false));
+
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Should throw ResourceAlreadyExistsException when updated values conflict with another expense")
+    void update_WhenResultIsDuplicate_ShouldThrowResourceAlreadyExistsException() {
+        User user = buildUser();
+        Category category = buildCategory(user);
+        UUID expenseId = UUID.randomUUID();
+        LocalDateTime date = LocalDateTime.of(2026, 7, 1, 10, 0);
+
+        Expense existing = Expense.builder()
+                .id(expenseId).owner(user).category(category)
+                .price(new BigDecimal("100.00")).description("Old desc")
+                .transactionDate(date).build();
+
+        Expense input = Expense.builder()
+                .id(expenseId).owner(user)
+                .price(new BigDecimal("150.00"))
+                .category(Category.builder().id(null).build())
+                .build();
+
+        doReturn(java.util.Optional.of(existing)).when(repository).findExpenseByOwnerIdAndId(user.getId(), expenseId);
+        doReturn(true).when(repository).existsDuplicateExcluding(
+                user.getId(), category.getId(), new BigDecimal("150.00"), date, "Old desc", expenseId);
+
+        assertThrows(ResourceAlreadyExistsException.class, () -> service.update(input, false));
+
+        verify(repository, never()).save(any());
+        verify(budgetService, never()).validateTransactionRespectsBudget(any(), any(), any());
+        verify(budgetService, never()).validateTransactionRespectsBudgetOnUpdate(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("Should throw ResourceAlreadyExistsException when database constraint is violated on update")
+    void update_WhenDataIntegrityViolationOccurs_ShouldThrowResourceAlreadyExistsException() {
+        User user = buildUser();
+        Category category = buildCategory(user);
+        UUID expenseId = UUID.randomUUID();
+        LocalDateTime date = LocalDateTime.of(2026, 7, 1, 10, 0);
+
+        Expense existing = Expense.builder()
+                .id(expenseId).owner(user).category(category)
+                .price(new BigDecimal("100.00")).description("Old desc")
+                .transactionDate(date).build();
+
+        Expense input = Expense.builder()
+                .id(expenseId).owner(user)
+                .description("New desc")
+                .category(Category.builder().id(null).build())
+                .build();
+
+        doReturn(java.util.Optional.of(existing)).when(repository).findExpenseByOwnerIdAndId(user.getId(), expenseId);
+        doReturn(false).when(repository).existsDuplicateExcluding(
+                user.getId(), category.getId(), new BigDecimal("100.00"), date, "New desc", expenseId);
+        doThrow(new DataIntegrityViolationException("constraint")).when(repository).save(any());
+
+        assertThrows(ResourceAlreadyExistsException.class, () -> service.update(input, false));
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────
