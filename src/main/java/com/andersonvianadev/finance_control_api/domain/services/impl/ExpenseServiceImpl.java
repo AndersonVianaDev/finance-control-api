@@ -8,6 +8,7 @@ import com.andersonvianadev.finance_control_api.domain.services.IBudgetService;
 import com.andersonvianadev.finance_control_api.domain.services.ICalendarService;
 import com.andersonvianadev.finance_control_api.domain.services.ICategoryService;
 import com.andersonvianadev.finance_control_api.domain.services.IExpenseService;
+import com.andersonvianadev.finance_control_api.infra.exceptions.NotFoundException;
 import com.andersonvianadev.finance_control_api.infra.exceptions.ResourceAlreadyExistsException;
 import com.andersonvianadev.finance_control_api.infra.repositories.ExpenseRepository;
 import lombok.RequiredArgsConstructor;
@@ -86,5 +87,11 @@ public class ExpenseServiceImpl implements IExpenseService {
             );
             throw new ResourceAlreadyExistsException("Expense already registered");
         }
+    }
+
+    @Override
+    public Expense findById(User user, UUID id) {
+        return repository.findExpenseByOwnerIdAndId(user.getId(), id)
+                .orElseThrow(() -> new NotFoundException(String.format("Expense with id %s not found", id.toString())));
     }
 }

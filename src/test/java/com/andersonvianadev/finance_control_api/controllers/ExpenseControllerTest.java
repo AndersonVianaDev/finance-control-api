@@ -13,6 +13,9 @@ import com.andersonvianadev.finance_control_api.infra.messaging.ISqsMessageSende
 import com.andersonvianadev.finance_control_api.infra.repositories.BudgetRepository;
 import com.andersonvianadev.finance_control_api.infra.repositories.CategoryRepository;
 import com.andersonvianadev.finance_control_api.infra.repositories.ExpenseRepository;
+import com.andersonvianadev.finance_control_api.infra.repositories.IncomeRepository;
+import com.andersonvianadev.finance_control_api.infra.repositories.InstallmentPlanRepository;
+import com.andersonvianadev.finance_control_api.infra.repositories.RecurringRuleRepository;
 import com.andersonvianadev.finance_control_api.infra.repositories.UserRepository;
 import com.andersonvianadev.finance_control_api.infra.security.UserPrincipal;
 import org.junit.jupiter.api.BeforeEach;
@@ -80,10 +83,22 @@ class ExpenseControllerTest {
     @Autowired
     private BudgetRepository budgetRepository;
 
+    @Autowired
+    private IncomeRepository incomeRepository;
+
+    @Autowired
+    private InstallmentPlanRepository installmentPlanRepository;
+
+    @Autowired
+    private RecurringRuleRepository recurringRuleRepository;
+
     @BeforeEach
     void setup() {
+        incomeRepository.deleteAll();
         expenseRepository.deleteAll();
+        installmentPlanRepository.deleteAll();
         budgetRepository.deleteAll();
+        recurringRuleRepository.deleteAll();
         categoryRepository.deleteAll();
         userRepository.deleteAll();
     }
@@ -302,5 +317,109 @@ class ExpenseControllerTest {
                 .andDo(MockMvcResultHandlers.print());
 
         assertEquals(1, expenseRepository.count());
+    }
+
+    // ── findById ─────────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("Should return 200 with expense when ID exists and belongs to user")
+    void findById_WhenExpenseExistsAndBelongsToUser_ShouldReturnOk() throws Exception {
+        User user = createUser("anderson@gmail.com");
+        Category category = createCategory(user);
+        UserPrincipal principal = new UserPrincipal(user);
+
+        ExpenseRequestDTO request = new ExpenseRequestDTO(
+                LocalDateTime.of(2026, 7, 1, 10, 0),
+                new BigDecimal("150.00"),
+                "Monthly gym membership",
+                category.getId()
+        );
+
+        MvcResult created = mockMvc.perform(MockMvcRequestBuilders.post("/expenses")
+                        .with(user(principal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(MockMvcResultMatchers.status().isCreated())
+                .andReturn();
+
+        UUID expenseId = objectMapper.readValue(
+                created.getResponse().getContentAsString(), ExpenseResponseDTO.class).id();
+
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.get("/expenses/{id}", expenseId)
+                        .with(user(principal)))
+                .andExpect(MockMvcResultMatchers.status().isOk())
+                .andDo(MockMvcResultHandlers.print())
+                .andReturn();
+
+        ExpenseResponseDTO response = objectMapper.readValue(
+                result.getResponse().getContentAsString(), ExpenseResponseDTO.class);
+
+        assertEquals(expenseId, response.id());
+        assertEquals(LocalDateTime.of(2026, 7, 1, 10, 0), response.transactionDate());
+        assertEquals(0, new BigDecimal("150.00").compareTo(response.price()));
+        assertEquals("Monthly gym membership", response.description());
+        assertEquals(category.getId(), response.category().id());
+    }
+
+    @Test
+    @DisplayName("Should return 404 when expense ID does not exist")
+    void findById_WhenExpenseDoesNotExist_ShouldReturnNotFound() throws Exception {
+        User user = createUser("anderson@gmail.com");
+        UserPrincipal principal = new UserPrincipal(user);
+
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.get("/expenses/{id}", UUID.randomUUID())
+                        .with(user(principal)))
+                .andExpect(MockMvcResultMatchers.status().isNotFound())
+                .andDo(MockMvcResultHandlers.print())
+                .andReturn();
+
+        StandardException exception = objectMapper.readValue(
+                result.getResponse().getContentAsString(), StandardException.class);
+
+        assertEquals(HttpStatus.NOT_FOUND.value(), exception.status());
+    }
+
+    @Test
+    @DisplayName("Should return 404 when expense belongs to another user")
+    void findById_WhenExpenseBelongsToAnotherUser_ShouldReturnNotFound() throws Exception {
+        User owner = createUser("anderson@gmail.com");
+        User other = createUser("other@gmail.com");
+        Category category = createCategory(owner);
+        UserPrincipal ownerPrincipal = new UserPrincipal(owner);
+        UserPrincipal otherPrincipal = new UserPrincipal(other);
+
+        MvcResult created = mockMvc.perform(MockMvcRequestBuilders.post("/expenses")
+                        .with(user(ownerPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new ExpenseRequestDTO(
+                                LocalDateTime.of(2026, 7, 1, 10, 0),
+                                new BigDecimal("150.00"),
+                                "Monthly gym membership",
+                                category.getId()
+                        ))))
+                .andExpect(MockMvcResultMatchers.status().isCreated())
+                .andReturn();
+
+        UUID expenseId = objectMapper.readValue(
+                created.getResponse().getContentAsString(), ExpenseResponseDTO.class).id();
+
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.get("/expenses/{id}", expenseId)
+                        .with(user(otherPrincipal)))
+                .andExpect(MockMvcResultMatchers.status().isNotFound())
+                .andDo(MockMvcResultHandlers.print())
+                .andReturn();
+
+        StandardException exception = objectMapper.readValue(
+                result.getResponse().getContentAsString(), StandardException.class);
+
+        assertEquals(HttpStatus.NOT_FOUND.value(), exception.status());
+    }
+
+    @Test
+    @DisplayName("Should return 403 when request is unauthenticated")
+    void findById_WhenUnauthenticated_ShouldReturnForbidden() throws Exception {
+        mockMvc.perform(MockMvcRequestBuilders.get("/expenses/{id}", UUID.randomUUID()))
+                .andExpect(MockMvcResultMatchers.status().isForbidden())
+                .andDo(MockMvcResultHandlers.print());
     }
 }

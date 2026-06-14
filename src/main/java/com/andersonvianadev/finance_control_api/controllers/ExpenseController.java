@@ -12,11 +12,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/expenses")
@@ -35,5 +33,16 @@ public class ExpenseController implements IExpenseController {
         Expense expense = ExpenseMapper.toDomain(user, request);
         Expense saved = service.save(expense, skipBudget);
         return ResponseEntity.status(HttpStatus.CREATED).body(ExpenseMapper.toResponse(saved));
+    }
+
+    @Override
+    @GetMapping("/{id}")
+    public ResponseEntity<ExpenseResponseDTO> findById(
+            @AuthenticationPrincipal(expression = "user") User user,
+            @PathVariable UUID id
+    ) {
+        Expense expense = service.findById(user, id);
+        ExpenseResponseDTO response = ExpenseMapper.toResponse(expense);
+        return ResponseEntity.ok(response);
     }
 }
