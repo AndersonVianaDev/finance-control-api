@@ -32,6 +32,7 @@ public class BudgetMapper {
 
     public static BudgetResponseDTO toResponse(Budget budget) {
         return new BudgetResponseDTO(
+                budget.getId(),
                 UserMapper.toResponse(budget.getOwner()),
                 CategoryMapper.toResponse(budget.getCategory()),
                 budget.getBudgetType(),
