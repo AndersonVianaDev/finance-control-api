@@ -132,6 +132,7 @@ class BudgetControllerTest {
         BudgetResponseDTO response = objectMapper.readValue(content, BudgetResponseDTO.class);
 
         assertNotNull(response);
+        assertNotNull(response.id());
         assertEquals(userSaved.getId(), response.user().id());
         assertEquals(categorySaved.getId(), response.category().id());
         assertEquals(request.budgetType(), response.budgetType());
@@ -322,6 +323,7 @@ class BudgetControllerTest {
         BudgetResponseDTO response = objectMapper.readValue(content, BudgetResponseDTO.class);
 
         assertNotNull(response);
+        assertEquals(budgetSaved.getId(), response.id());
         assertEquals(userSaved.getId(), response.user().id());
         assertEquals(categorySaved.getId(), response.category().id());
         assertEquals(budgetSaved.getBudgetType(), response.budgetType());
@@ -465,6 +467,7 @@ class BudgetControllerTest {
 
         BudgetResponseDTO response = objectMapper.readValue(content, BudgetResponseDTO.class);
 
+        assertEquals(budgetSaved.getId(), response.id());
         assertEquals(update.budgetType(), response.budgetType());
         assertEquals(0, update.limitAmount().compareTo(response.limitAmount()));
         assertEquals(update.active(), response.active());
@@ -696,6 +699,7 @@ class BudgetControllerTest {
         PageResponseDTO<BudgetResponseDTO> response = objectMapper.readValue(content, pageType);
 
         assertEquals(2, response.content().size());
+        response.content().forEach(b -> assertNotNull(b.id()));
         assertEquals(0, response.page());
         assertEquals(10, response.size());
         assertEquals(2, response.totalElement());
