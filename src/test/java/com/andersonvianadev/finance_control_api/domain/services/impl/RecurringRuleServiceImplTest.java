@@ -10,9 +10,9 @@ import com.andersonvianadev.finance_control_api.domain.models.enums.TransactionP
 import com.andersonvianadev.finance_control_api.domain.models.enums.UserRole;
 import com.andersonvianadev.finance_control_api.domain.services.ICategoryService;
 import com.andersonvianadev.finance_control_api.domain.services.IExpenseService;
+import com.andersonvianadev.finance_control_api.domain.services.IIncomeService;
 import com.andersonvianadev.finance_control_api.infra.exceptions.NotFoundException;
 import com.andersonvianadev.finance_control_api.infra.exceptions.ResourceAlreadyExistsException;
-import com.andersonvianadev.finance_control_api.infra.repositories.IncomeRepository;
 import com.andersonvianadev.finance_control_api.infra.repositories.RecurringRuleRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -62,7 +62,7 @@ class RecurringRuleServiceImplTest {
     private IExpenseService expenseService;
 
     @Mock
-    private IncomeRepository incomeRepository;
+    private IIncomeService incomeService;
 
     @InjectMocks
     private RecurringRuleServiceImpl service;
@@ -142,7 +142,7 @@ class RecurringRuleServiceImplTest {
         }
 
         verify(expenseService, times(1)).save(any(), eq(true));
-        verify(incomeRepository, never()).save(any());
+        verify(incomeService, never()).save(any(), anyBoolean());
     }
 
     @Test
@@ -161,7 +161,7 @@ class RecurringRuleServiceImplTest {
         }
 
         verify(expenseService, never()).save(any(), anyBoolean());
-        verify(incomeRepository, never()).save(any());
+        verify(incomeService, never()).save(any(), anyBoolean());
     }
 
     @Test
@@ -174,8 +174,7 @@ class RecurringRuleServiceImplTest {
                 LocalDateTime.of(2026, 6, 8, 0, 0)); // also a Monday
 
         doReturn(List.of(rule)).when(repository).findAllByIsActiveTrue();
-        doReturn(false).when(incomeRepository).existsDuplicate(any(), any(), any(), any(), any());
-        doReturn(Income.builder().id(UUID.randomUUID()).build()).when(incomeRepository).save(any());
+        doReturn(Income.builder().id(UUID.randomUUID()).build()).when(incomeService).save(any(), eq(true));
 
         try (MockedStatic<LocalDate> mock = Mockito.mockStatic(LocalDate.class, Mockito.CALLS_REAL_METHODS)) {
             mock.when(LocalDate::now).thenReturn(today);
@@ -183,7 +182,7 @@ class RecurringRuleServiceImplTest {
             service.processRecurringOccurrences();
         }
 
-        verify(incomeRepository, times(1)).save(any());
+        verify(incomeService, times(1)).save(any(), eq(true));
         verify(expenseService, never()).save(any(), anyBoolean());
     }
 
@@ -195,7 +194,8 @@ class RecurringRuleServiceImplTest {
                 LocalDateTime.of(2026, 1, 15, 0, 0));
 
         doReturn(List.of(rule)).when(repository).findAllByIsActiveTrue();
-        doReturn(true).when(incomeRepository).existsDuplicate(any(), any(), any(), any(), any());
+        doThrow(new ResourceAlreadyExistsException("Income already registered"))
+                .when(incomeService).save(any(), eq(true));
 
         try (MockedStatic<LocalDate> mock = Mockito.mockStatic(LocalDate.class, Mockito.CALLS_REAL_METHODS)) {
             mock.when(LocalDate::now).thenReturn(today);
@@ -203,7 +203,7 @@ class RecurringRuleServiceImplTest {
             service.processRecurringOccurrences();
         }
 
-        verify(incomeRepository, never()).save(any());
+        verify(incomeService, times(1)).save(any(), eq(true));
     }
 
     @Test
@@ -217,8 +217,7 @@ class RecurringRuleServiceImplTest {
 
         doReturn(List.of(failingRule, incomeRule)).when(repository).findAllByIsActiveTrue();
         doThrow(new RuntimeException("unexpected error")).when(expenseService).save(any(), eq(true));
-        doReturn(false).when(incomeRepository).existsDuplicate(any(), any(), any(), any(), any());
-        doReturn(Income.builder().id(UUID.randomUUID()).build()).when(incomeRepository).save(any());
+        doReturn(Income.builder().id(UUID.randomUUID()).build()).when(incomeService).save(any(), eq(true));
 
         try (MockedStatic<LocalDate> mock = Mockito.mockStatic(LocalDate.class, Mockito.CALLS_REAL_METHODS)) {
             mock.when(LocalDate::now).thenReturn(today);
@@ -227,7 +226,7 @@ class RecurringRuleServiceImplTest {
         }
 
         verify(expenseService, times(1)).save(any(), eq(true));
-        verify(incomeRepository, times(1)).save(any());
+        verify(incomeService, times(1)).save(any(), eq(true));
     }
 
     // ── findAll ──────────────────────────────────────────────────────────────

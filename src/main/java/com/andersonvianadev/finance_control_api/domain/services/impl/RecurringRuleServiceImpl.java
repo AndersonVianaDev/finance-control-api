@@ -9,10 +9,10 @@ import com.andersonvianadev.finance_control_api.domain.models.enums.RecurringTyp
 import com.andersonvianadev.finance_control_api.domain.models.enums.TransactionPeriodType;
 import com.andersonvianadev.finance_control_api.domain.services.ICategoryService;
 import com.andersonvianadev.finance_control_api.domain.services.IExpenseService;
+import com.andersonvianadev.finance_control_api.domain.services.IIncomeService;
 import com.andersonvianadev.finance_control_api.domain.services.IRecurringRuleService;
 import com.andersonvianadev.finance_control_api.infra.exceptions.NotFoundException;
 import com.andersonvianadev.finance_control_api.infra.exceptions.ResourceAlreadyExistsException;
-import com.andersonvianadev.finance_control_api.infra.repositories.IncomeRepository;
 import com.andersonvianadev.finance_control_api.infra.repositories.RecurringRuleRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,7 +33,7 @@ public class RecurringRuleServiceImpl implements IRecurringRuleService {
     private final RecurringRuleRepository repository;
     private final ICategoryService categoryService;
     private final IExpenseService expenseService;
-    private final IncomeRepository incomeRepository;
+    private final IIncomeService incomeService;
 
     @Override
     public RecurringRule save(RecurringRule recurringRule) {
@@ -157,19 +157,6 @@ public class RecurringRuleServiceImpl implements IRecurringRuleService {
     }
 
     private void generateIncome(RecurringRule rule, LocalDateTime transactionDate) {
-        boolean alreadyExists = incomeRepository.existsDuplicate(
-                rule.getOwner().getId(),
-                rule.getCategory().getId(),
-                rule.getPrice(),
-                transactionDate,
-                rule.getDescription()
-        );
-
-        if (alreadyExists) {
-            log.warn("Income already generated for rule={} on date={}", rule.getId(), transactionDate.toLocalDate());
-            return;
-        }
-
         Income income = Income.builder()
                 .owner(rule.getOwner())
                 .category(rule.getCategory())
@@ -178,7 +165,11 @@ public class RecurringRuleServiceImpl implements IRecurringRuleService {
                 .transactionDate(transactionDate)
                 .build();
 
-        incomeRepository.save(income);
+        try {
+            incomeService.save(income, true);
+        } catch (ResourceAlreadyExistsException e) {
+            log.warn("Income already generated for rule={} on date={}", rule.getId(), transactionDate.toLocalDate());
+        }
     }
 
     private void generateExpense(RecurringRule rule, LocalDateTime transactionDate) {
@@ -190,7 +181,6 @@ public class RecurringRuleServiceImpl implements IRecurringRuleService {
                 .transactionDate(transactionDate)
                 .build();
 
-        // skipBudget=true: recurring expenses are real charges regardless of budget limits
         expenseService.save(expense, true);
     }
 }
