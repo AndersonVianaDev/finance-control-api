@@ -21,7 +21,9 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestParam;
 
+import java.time.LocalDate;
 import java.util.UUID;
 
 @Tag(
@@ -453,5 +455,88 @@ public interface IInstallmentPlanController {
             @AuthenticationPrincipal(expression = "user") User user,
             @Parameter(description = "Installment plan id", example = "a1b2c3d4-1234-5678-abcd-ef0123456789")
             @PathVariable UUID id
+    );
+
+    @Operation(
+            summary = "List installment plans by firstDueDate range",
+            description = """
+                    Returns a paginated list of the authenticated user's installment plans
+                    whose firstDueDate falls within the given range (inclusive on both ends).
+
+                    The expenses list is empty for all items — use GET /installment-plans/{id}
+                    to retrieve the full expense list of a specific plan.
+
+                    Both start and finish must be provided in ISO-8601 format (yyyy-MM-dd).
+                    """,
+            security = @SecurityRequirement(name = "bearerAuth"),
+            responses = {
+                    @ApiResponse(
+                            responseCode = "200",
+                            description = "Page of plans within the range. May be empty if no plans fall within the specified dates.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    examples = @ExampleObject(
+                                            name = "Page with one matching plan.",
+                                            value = """
+                                                    {
+                                                        "content": [
+                                                            {
+                                                                "id": "a1b2c3d4-1234-5678-abcd-ef0123456789",
+                                                                "description": "MacBook Pro 14",
+                                                                "totalAmount": 18000.00,
+                                                                "installmentAmount": 1500.00,
+                                                                "totalInstallments": 12,
+                                                                "paidInstallments": 0,
+                                                                "status": "ACTIVE",
+                                                                "firstDueDate": "2026-07-01",
+                                                                "category": {
+                                                                    "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+                                                                    "name": "Technology",
+                                                                    "description": "Electronics and gadgets",
+                                                                    "icon": "tech",
+                                                                    "owner": null
+                                                                },
+                                                                "expenses": []
+                                                            }
+                                                        ],
+                                                        "page": 0,
+                                                        "size": 10,
+                                                        "totalElement": 1,
+                                                        "totalPages": 1,
+                                                        "last": true
+                                                    }
+                                                    """
+                                    )
+                            )
+                    ),
+                    @ApiResponse(
+                            responseCode = "401",
+                            description = "Unauthorized. Missing or invalid JWT token.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = StandardException.class),
+                                    examples = @ExampleObject(
+                                            name = "Missing or invalid token.",
+                                            value = """
+                                                    {
+                                                        "timestamp": "2026-06-07T09:00:00Z",
+                                                        "status": 401,
+                                                        "error": "Unauthorized",
+                                                        "path": "/nix-finance-api/installment-plans"
+                                                    }
+                                                    """
+                                    )
+                            )
+                    )
+            }
+    )
+    ResponseEntity<PageResponseDTO<InstallmentPlanResponseDTO>> findBetweenFirstDueDate(
+            @Parameter(hidden = true)
+            @AuthenticationPrincipal(expression = "user") User user,
+            @Parameter(description = "Start date of the range (inclusive), format: yyyy-MM-dd", example = "2026-07-01")
+            @RequestParam(value = "start") LocalDate start,
+            @Parameter(description = "End date of the range (inclusive), format: yyyy-MM-dd", example = "2026-09-30")
+            @RequestParam(value = "finish") LocalDate finish,
+            @PageableDefault(size = 10) Pageable pageable
     );
 }

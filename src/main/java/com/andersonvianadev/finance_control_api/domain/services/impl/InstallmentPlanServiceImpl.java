@@ -23,6 +23,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.util.UUID;
 
 @Slf4j
@@ -125,5 +126,10 @@ public class InstallmentPlanServiceImpl implements IInstallmentPlanService {
         repository.save(plan);
 
         log.info("InstallmentPlan id={} cancelled. All associated expenses deleted.", plan.getId());
+    }
+
+    @Override
+    public Page<InstallmentPlan> findBetweenFirstDueDate(User user, LocalDate start, LocalDate finish, Pageable pageable) {
+        return repository.findByOwnerIdAndFirstDueDateBetween(user.getId(), start, finish, pageable);
     }
 }

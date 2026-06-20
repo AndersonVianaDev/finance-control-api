@@ -6,6 +6,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -13,4 +14,8 @@ import java.util.UUID;
 public interface InstallmentPlanRepository extends JpaRepository<InstallmentPlan, UUID> {
     Optional<InstallmentPlan> findByOwnerIdAndId(UUID ownerId, UUID id);
     Page<InstallmentPlan> findByOwnerId(UUID ownerId, Pageable pageable);
+    Page<InstallmentPlan> findByOwnerIdAndFirstDueDateBetween(
+            UUID ownerId, LocalDate start,
+            LocalDate finish, Pageable pageable
+    );
 }
