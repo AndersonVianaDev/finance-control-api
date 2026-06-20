@@ -1,6 +1,8 @@
 package com.andersonvianadev.finance_control_api.infra.repositories;
 
 import com.andersonvianadev.finance_control_api.domain.models.RecurringRule;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -23,4 +25,13 @@ public interface RecurringRuleRepository extends JpaRepository<RecurringRule, UU
 
     List<RecurringRule> findAllByIsActiveTrue();
     Optional<RecurringRule> findByOwnerIdAndId(UUID ownerId, UUID id);
+    Page<RecurringRule> findAllByOwnerId(UUID ownerId, Pageable pageable);
+    boolean existsRecurringRuleByOwnerIdAndCategoryIdAndPriceAndTransactionDateAndDescriptionAndIdNot(
+            UUID ownerId,
+            UUID categoryId,
+            BigDecimal price,
+            LocalDateTime transactionDate,
+            String description,
+            UUID id
+    );
 }
