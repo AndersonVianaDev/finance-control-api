@@ -1136,6 +1136,171 @@ class ExpenseControllerTest {
         assertEquals(HttpStatus.BAD_REQUEST.value(), exception.status());
     }
 
+    // ── findBetweenTransactionDate ───────────────────────────────────────────
+
+    @Test
+    @DisplayName("Should return only expenses whose transactionDate falls within the given date range")
+    void findBetweenTransactionDate_WhenExpensesExistInRange_ShouldReturnOnlyMatchingExpenses() throws Exception {
+        User user = createUser("anderson@gmail.com");
+        Category category = createCategory(user);
+        UserPrincipal principal = new UserPrincipal(user);
+
+        for (int i = 1; i <= 2; i++) {
+            mockMvc.perform(MockMvcRequestBuilders.post("/expenses")
+                            .with(user(principal))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(new ExpenseRequestDTO(
+                                    LocalDateTime.of(2026, 6, i * 10, 10, 0),
+                                    new BigDecimal("100.00"),
+                                    "Expense in range " + i,
+                                    category.getId()
+                            ))))
+                    .andExpect(MockMvcResultMatchers.status().isCreated());
+        }
+
+        mockMvc.perform(MockMvcRequestBuilders.post("/expenses")
+                        .with(user(principal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new ExpenseRequestDTO(
+                                LocalDateTime.of(2026, 8, 1, 10, 0),
+                                new BigDecimal("200.00"),
+                                "Expense out of range",
+                                category.getId()
+                        ))))
+                .andExpect(MockMvcResultMatchers.status().isCreated());
+
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.get("/expenses")
+                        .param("start", "2026-06-01")
+                        .param("finish", "2026-06-30")
+                        .with(user(principal)))
+                .andExpect(MockMvcResultMatchers.status().isOk())
+                .andReturn();
+
+        JavaType pageType = objectMapper.getTypeFactory()
+                .constructParametricType(PageResponseDTO.class, ExpenseResponseDTO.class);
+        PageResponseDTO<ExpenseResponseDTO> response = objectMapper.readValue(
+                result.getResponse().getContentAsString(), pageType);
+
+        assertEquals(2, response.totalElement());
+        assertEquals(2, response.content().size());
+    }
+
+    @Test
+    @DisplayName("Should include expenses registered at any hour on the finish date")
+    void findBetweenTransactionDate_WhenFinishDayIsFullyInclusive_ShouldIncludeExpensesAtAnyHour() throws Exception {
+        User user = createUser("anderson@gmail.com");
+        Category category = createCategory(user);
+        UserPrincipal principal = new UserPrincipal(user);
+
+        mockMvc.perform(MockMvcRequestBuilders.post("/expenses")
+                        .with(user(principal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new ExpenseRequestDTO(
+                                LocalDateTime.of(2026, 6, 30, 22, 45),
+                                new BigDecimal("100.00"),
+                                "Late night expense on finish day",
+                                category.getId()
+                        ))))
+                .andExpect(MockMvcResultMatchers.status().isCreated());
+
+        mockMvc.perform(MockMvcRequestBuilders.post("/expenses")
+                        .with(user(principal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new ExpenseRequestDTO(
+                                LocalDateTime.of(2026, 7, 1, 9, 0),
+                                new BigDecimal("100.00"),
+                                "Expense the day after finish",
+                                category.getId()
+                        ))))
+                .andExpect(MockMvcResultMatchers.status().isCreated());
+
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.get("/expenses")
+                        .param("start", "2026-06-01")
+                        .param("finish", "2026-06-30")
+                        .with(user(principal)))
+                .andExpect(MockMvcResultMatchers.status().isOk())
+                .andReturn();
+
+        JavaType pageType = objectMapper.getTypeFactory()
+                .constructParametricType(PageResponseDTO.class, ExpenseResponseDTO.class);
+        PageResponseDTO<ExpenseResponseDTO> response = objectMapper.readValue(
+                result.getResponse().getContentAsString(), pageType);
+
+        assertEquals(1, response.totalElement());
+        assertEquals("Late night expense on finish day", response.content().get(0).description());
+    }
+
+    @Test
+    @DisplayName("Should return empty page when no expenses fall within the given date range")
+    void findBetweenTransactionDate_WhenNoExpensesInRange_ShouldReturnEmptyPage() throws Exception {
+        User user = createUser("anderson@gmail.com");
+        Category category = createCategory(user);
+        UserPrincipal principal = new UserPrincipal(user);
+
+        mockMvc.perform(MockMvcRequestBuilders.post("/expenses")
+                        .with(user(principal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new ExpenseRequestDTO(
+                                LocalDateTime.of(2026, 9, 1, 10, 0),
+                                new BigDecimal("100.00"),
+                                "Expense outside range",
+                                category.getId()
+                        ))))
+                .andExpect(MockMvcResultMatchers.status().isCreated());
+
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.get("/expenses")
+                        .param("start", "2026-06-01")
+                        .param("finish", "2026-06-30")
+                        .with(user(principal)))
+                .andExpect(MockMvcResultMatchers.status().isOk())
+                .andReturn();
+
+        JavaType pageType = objectMapper.getTypeFactory()
+                .constructParametricType(PageResponseDTO.class, ExpenseResponseDTO.class);
+        PageResponseDTO<ExpenseResponseDTO> response = objectMapper.readValue(
+                result.getResponse().getContentAsString(), pageType);
+
+        assertEquals(0, response.totalElement());
+        assertTrue(response.content().isEmpty());
+    }
+
+    @Test
+    @DisplayName("Should not return expenses belonging to another user even if they fall within the range")
+    void findBetweenTransactionDate_WhenExpensesBelongToAnotherUser_ShouldReturnEmptyPage() throws Exception {
+        User owner = createUser("anderson@gmail.com");
+        User other = createUser("other@gmail.com");
+        Category ownerCategory = createCategory(owner);
+        Category otherCategory = createCategory(other);
+        UserPrincipal ownerPrincipal = new UserPrincipal(owner);
+        UserPrincipal otherPrincipal = new UserPrincipal(other);
+
+        mockMvc.perform(MockMvcRequestBuilders.post("/expenses")
+                        .with(user(ownerPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new ExpenseRequestDTO(
+                                LocalDateTime.of(2026, 6, 15, 10, 0),
+                                new BigDecimal("100.00"),
+                                "Owner expense in range",
+                                ownerCategory.getId()
+                        ))))
+                .andExpect(MockMvcResultMatchers.status().isCreated());
+
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.get("/expenses")
+                        .param("start", "2026-06-01")
+                        .param("finish", "2026-06-30")
+                        .with(user(otherPrincipal)))
+                .andExpect(MockMvcResultMatchers.status().isOk())
+                .andReturn();
+
+        JavaType pageType = objectMapper.getTypeFactory()
+                .constructParametricType(PageResponseDTO.class, ExpenseResponseDTO.class);
+        PageResponseDTO<ExpenseResponseDTO> response = objectMapper.readValue(
+                result.getResponse().getContentAsString(), pageType);
+
+        assertEquals(0, response.totalElement());
+        assertTrue(response.content().isEmpty());
+    }
+
     @Test
     @DisplayName("Should return 400 when description is empty string")
     void update_WhenDescriptionIsEmpty_ShouldReturn400() throws Exception {

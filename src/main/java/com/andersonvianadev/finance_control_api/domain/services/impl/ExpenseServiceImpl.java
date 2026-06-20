@@ -199,4 +199,12 @@ public class ExpenseServiceImpl implements IExpenseService {
     public List<Expense> findByInstallmentPlan(UUID planId) {
         return repository.findByInstallmentPlanIdOrderByInstallmentNumberAsc(planId);
     }
+
+    @Override
+    public Page<Expense> findBetweenTransactionDate(User user, LocalDateTime start, LocalDateTime finish, Pageable pageable) {
+        return repository.findByOwnerIdAndTransactionDateBetween(
+                user.getId(), start,
+                finish, pageable
+        );
+    }
 }

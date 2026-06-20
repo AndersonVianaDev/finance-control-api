@@ -76,4 +76,9 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
     @Modifying
     @Query("DELETE FROM Expense e WHERE e.installmentPlan.id = :planId")
     void deleteByInstallmentPlanId(@Param("planId") UUID planId);
+
+    Page<Expense> findByOwnerIdAndTransactionDateBetween(
+            UUID ownerId, LocalDateTime start,
+            LocalDateTime finish, Pageable pageable
+    );
 }
