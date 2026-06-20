@@ -38,5 +38,16 @@ app:
       requests-per-minute: 5
     auth:
       requests-per-minute: 2
+  client:
+    url:
+      calendar-api: http://localhost
+    calendar-api:
+      api-key: test-key
 
 spring.threads.virtual.enabled: true
+
+aws:
+  enabled: false
+  sqs:
+    queues:
+      installment-generation: http://test-queue/000000000000/installment-generation-queue

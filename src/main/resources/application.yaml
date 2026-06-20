@@ -37,5 +37,20 @@ app:
       requests-per-minute: ${APP_RATE_LIMIT_GLOBAL_REQUESTS_PER_MINUTE:100}
     auth:
       requests-per-minute: ${APP_RATE_LIMIT_AUTH_REQUESTS_PER_MINUTE:5}
+  client:
+    url:
+      calendar-api: ${CALENDAR_API_URL}
+    calendar-api:
+      api-key: ${CALENDAR_API_KEY}
 
 spring.threads.virtual.enabled: true
+
+aws:
+  enabled: true
+  region: ${AWS_REGION}
+  access-key: ${AWS_ACCESS_KEY}
+  secret-key: ${AWS_SECRET_KEY}
+  endpoint-override: ${AWS_ENDPOINT}
+  sqs:
+    queues:
+      installment-generation: ${AWS_QUEUE_INSTALLMENT_GENERATION}

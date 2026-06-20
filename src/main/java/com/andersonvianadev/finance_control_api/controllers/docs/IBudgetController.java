@@ -49,6 +49,7 @@ public interface IBudgetController {
                                             name = "Budget created.",
                                             value = """
                                                     {
+                                                        "id": "b5f1c3d2-9876-4321-abcd-ef0123456789",
                                                         "user": {
                                                             "id": "9cb12d90-4623-41c2-b3fc-1a963f77bcf1",
                                                             "name": "Anderson",
@@ -198,6 +199,7 @@ public interface IBudgetController {
                                             name = "Budget found.",
                                             value = """
                                                     {
+                                                        "id": "b5f1c3d2-9876-4321-abcd-ef0123456789",
                                                         "user": {
                                                             "id": "9cb12d90-4623-41c2-b3fc-1a963f77bcf1",
                                                             "name": "Anderson",
@@ -287,6 +289,7 @@ public interface IBudgetController {
                                             name = "Budget updated.",
                                             value = """
                                                     {
+                                                        "id": "b5f1c3d2-9876-4321-abcd-ef0123456789",
                                                         "user": {
                                                             "id": "9cb12d90-4623-41c2-b3fc-1a963f77bcf1",
                                                             "name": "Anderson",
@@ -484,6 +487,7 @@ public interface IBudgetController {
                                                     {
                                                         "content": [
                                                             {
+                                                                "id": "b5f1c3d2-9876-4321-abcd-ef0123456789",
                                                                 "user": {
                                                                     "id": "9cb12d90-4623-41c2-b3fc-1a963f77bcf1",
                                                                     "name": "Anderson",
