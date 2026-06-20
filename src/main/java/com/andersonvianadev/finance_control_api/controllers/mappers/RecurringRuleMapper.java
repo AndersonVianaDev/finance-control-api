@@ -1,15 +1,31 @@
 package com.andersonvianadev.finance_control_api.controllers.mappers;
 
 import com.andersonvianadev.finance_control_api.controllers.dtos.requests.RecurringRuleRequestDTO;
+import com.andersonvianadev.finance_control_api.controllers.dtos.requests.RecurringRuleUpdateDTO;
 import com.andersonvianadev.finance_control_api.controllers.dtos.responses.RecurringRuleResponseDTO;
 import com.andersonvianadev.finance_control_api.domain.models.Category;
 import com.andersonvianadev.finance_control_api.domain.models.RecurringRule;
 import com.andersonvianadev.finance_control_api.domain.models.User;
 
+import java.util.UUID;
+
 public class RecurringRuleMapper {
 
     public static RecurringRule toDomain(User owner, RecurringRuleRequestDTO request) {
         return RecurringRule.builder()
+                .owner(owner)
+                .transactionDate(request.transactionDate())
+                .price(request.price())
+                .description(request.description())
+                .category(Category.builder().id(request.categoryId()).build())
+                .transactionPeriodType(request.transactionPeriodType())
+                .recurringType(request.recurringType())
+                .build();
+    }
+
+    public static RecurringRule toDomain(User owner, UUID id, RecurringRuleUpdateDTO request) {
+        return RecurringRule.builder()
+                .id(id)
                 .owner(owner)
                 .transactionDate(request.transactionDate())
                 .price(request.price())

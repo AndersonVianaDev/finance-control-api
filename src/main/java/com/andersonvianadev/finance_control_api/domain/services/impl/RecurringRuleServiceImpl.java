@@ -16,6 +16,8 @@ import com.andersonvianadev.finance_control_api.infra.repositories.IncomeReposit
 import com.andersonvianadev.finance_control_api.infra.repositories.RecurringRuleRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
@@ -86,6 +88,54 @@ public class RecurringRuleServiceImpl implements IRecurringRuleService {
                 .orElseThrow(() -> new NotFoundException(
                         String.format("Recurring rule with id %s not found", id)
                 ));
+    }
+
+    @Override
+    public Page<RecurringRule> findAll(User user, Pageable pageable) {
+        return repository.findAllByOwnerId(user.getId(), pageable);
+    }
+
+    @Override
+    public void delete(User user, UUID id) {
+        RecurringRule rule = findById(user, id);
+        repository.delete(rule);
+    }
+
+    @Override
+    public RecurringRule toggle(User user, UUID id) {
+        RecurringRule rule = findById(user, id);
+        rule.setIsActive(!rule.getIsActive());
+        return repository.save(rule);
+    }
+
+    @Override
+    public RecurringRule update(RecurringRule rule) {
+        RecurringRule existing = findById(rule.getOwner(), rule.getId());
+
+        UUID categoryId = rule.getCategory().getId();
+        Category category = categoryService.findByIdAndOwnerOrOwnerIsNull(categoryId, rule.getOwner());
+
+        boolean exists = repository.existsRecurringRuleByOwnerIdAndCategoryIdAndPriceAndTransactionDateAndDescriptionAndIdNot(
+                rule.getOwner().getId(),
+                categoryId,
+                rule.getPrice(),
+                rule.getTransactionDate(),
+                rule.getDescription(),
+                existing.getId()
+        );
+
+        if (exists) {
+            throw new ResourceAlreadyExistsException("Recurring rule already registered");
+        }
+
+        existing.setTransactionDate(rule.getTransactionDate());
+        existing.setPrice(rule.getPrice());
+        existing.setDescription(rule.getDescription());
+        existing.setCategory(category);
+        existing.setTransactionPeriodType(rule.getTransactionPeriodType());
+        existing.setRecurringType(rule.getRecurringType());
+
+        return repository.save(existing);
     }
 
     private boolean isDueToday(RecurringRule rule, LocalDate today) {
