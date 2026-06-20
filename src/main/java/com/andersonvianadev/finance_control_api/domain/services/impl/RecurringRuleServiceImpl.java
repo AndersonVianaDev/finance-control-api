@@ -10,6 +10,7 @@ import com.andersonvianadev.finance_control_api.domain.models.enums.TransactionP
 import com.andersonvianadev.finance_control_api.domain.services.ICategoryService;
 import com.andersonvianadev.finance_control_api.domain.services.IExpenseService;
 import com.andersonvianadev.finance_control_api.domain.services.IRecurringRuleService;
+import com.andersonvianadev.finance_control_api.infra.exceptions.NotFoundException;
 import com.andersonvianadev.finance_control_api.infra.exceptions.ResourceAlreadyExistsException;
 import com.andersonvianadev.finance_control_api.infra.repositories.IncomeRepository;
 import com.andersonvianadev.finance_control_api.infra.repositories.RecurringRuleRepository;
@@ -77,6 +78,14 @@ public class RecurringRuleServiceImpl implements IRecurringRuleService {
                 log.error("Failed to generate recurring transaction for rule={}. Skipping.", rule.getId(), e);
             }
         }
+    }
+
+    @Override
+    public RecurringRule findById(User user, UUID id) {
+        return repository.findByOwnerIdAndId(user.getId(), id)
+                .orElseThrow(() -> new NotFoundException(
+                        String.format("Recurring rule with id %s not found", id)
+                ));
     }
 
     private boolean isDueToday(RecurringRule rule, LocalDate today) {

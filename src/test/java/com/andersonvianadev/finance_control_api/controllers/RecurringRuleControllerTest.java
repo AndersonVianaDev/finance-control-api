@@ -3,6 +3,7 @@ package com.andersonvianadev.finance_control_api.controllers;
 import com.andersonvianadev.finance_control_api.controllers.dtos.requests.RecurringRuleRequestDTO;
 import com.andersonvianadev.finance_control_api.controllers.dtos.responses.RecurringRuleResponseDTO;
 import com.andersonvianadev.finance_control_api.domain.models.Category;
+import com.andersonvianadev.finance_control_api.domain.models.RecurringRule;
 import com.andersonvianadev.finance_control_api.domain.models.User;
 import com.andersonvianadev.finance_control_api.domain.models.enums.RecurringType;
 import com.andersonvianadev.finance_control_api.domain.models.enums.TransactionPeriodType;
@@ -281,8 +282,8 @@ class RecurringRuleControllerTest {
     }
 
     @Test
-    @DisplayName("Should return 401 when request is unauthenticated")
-    void save_WhenUnauthenticated_ShouldReturn401() throws Exception {
+    @DisplayName("Should return 403 when request is unauthenticated")
+    void save_WhenUnauthenticated_ShouldReturn403() throws Exception {
         RecurringRuleRequestDTO request = new RecurringRuleRequestDTO(
                 LocalDateTime.of(2026, 6, 5, 0, 0),
                 new BigDecimal("5000.00"),
@@ -295,6 +296,86 @@ class RecurringRuleControllerTest {
         mockMvc.perform(MockMvcRequestBuilders.post("/recurring-rule")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
+                .andExpect(MockMvcResultMatchers.status().isForbidden())
+                .andDo(MockMvcResultHandlers.print());
+    }
+
+    // ── findById ─────────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("Should return recurring rule when it exists and belongs to the user")
+    void findById_WhenRuleExistsAndBelongsToUser_ShouldReturn200() throws Exception {
+        User user = createUser();
+        Category category = createCategory(user, "salary");
+        UserPrincipal principal = new UserPrincipal(user);
+        RecurringRule rule = createRecurringRule(user, category, TransactionPeriodType.MONTHLY, RecurringType.INCOME);
+
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.get("/recurring-rule/{id}", rule.getId())
+                        .with(user(principal)))
+                .andExpect(MockMvcResultMatchers.status().isOk())
+                .andDo(MockMvcResultHandlers.print())
+                .andReturn();
+
+        RecurringRuleResponseDTO response = objectMapper.readValue(
+                result.getResponse().getContentAsString(), RecurringRuleResponseDTO.class);
+
+        assertEquals(rule.getId(), response.id());
+        assertEquals(rule.getDescription(), response.description());
+        assertEquals(0, rule.getPrice().compareTo(response.price()));
+        assertEquals(TransactionPeriodType.MONTHLY, response.transactionPeriodType());
+        assertEquals(RecurringType.INCOME, response.recurringType());
+        assertTrue(response.isActive());
+    }
+
+    @Test
+    @DisplayName("Should return 404 when rule does not exist")
+    void findById_WhenRuleNotFound_ShouldReturn404() throws Exception {
+        User user = createUser();
+        UserPrincipal principal = new UserPrincipal(user);
+
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.get("/recurring-rule/{id}", UUID.randomUUID())
+                        .with(user(principal)))
+                .andExpect(MockMvcResultMatchers.status().isNotFound())
+                .andDo(MockMvcResultHandlers.print())
+                .andReturn();
+
+        StandardException exception = objectMapper.readValue(
+                result.getResponse().getContentAsString(), StandardException.class);
+
+        assertEquals(HttpStatus.NOT_FOUND.value(), exception.status());
+    }
+
+    @Test
+    @DisplayName("Should return 404 when rule belongs to another user")
+    void findById_WhenRuleBelongsToAnotherUser_ShouldReturn404() throws Exception {
+        User owner = createUser();
+        Category category = createCategory(owner, "salary");
+        RecurringRule rule = createRecurringRule(owner, category, TransactionPeriodType.MONTHLY, RecurringType.INCOME);
+
+        User otherUser = userService.save(User.builder()
+                .name("Other")
+                .email("other@gmail.com")
+                .password("Arthur@1406")
+                .role(UserRole.ROLE_USER)
+                .build());
+        UserPrincipal otherPrincipal = new UserPrincipal(otherUser);
+
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.get("/recurring-rule/{id}", rule.getId())
+                        .with(user(otherPrincipal)))
+                .andExpect(MockMvcResultMatchers.status().isNotFound())
+                .andDo(MockMvcResultHandlers.print())
+                .andReturn();
+
+        StandardException exception = objectMapper.readValue(
+                result.getResponse().getContentAsString(), StandardException.class);
+
+        assertEquals(HttpStatus.NOT_FOUND.value(), exception.status());
+    }
+
+    @Test
+    @DisplayName("Should return 403 when request is unauthenticated")
+    void findById_WhenUnauthenticated_ShouldReturn403() throws Exception {
+        mockMvc.perform(MockMvcRequestBuilders.get("/recurring-rule/{id}", UUID.randomUUID()))
                 .andExpect(MockMvcResultMatchers.status().isForbidden())
                 .andDo(MockMvcResultHandlers.print());
     }
@@ -316,6 +397,20 @@ class RecurringRuleControllerTest {
                 .description("Test category")
                 .icon("icon")
                 .owner(owner)
+                .build());
+    }
+
+    private RecurringRule createRecurringRule(User owner, Category category,
+                                              TransactionPeriodType period, RecurringType type) {
+        return recurringRuleRepository.save(RecurringRule.builder()
+                .owner(owner)
+                .category(category)
+                .transactionDate(LocalDateTime.of(2026, 6, 5, 0, 0))
+                .price(new BigDecimal("5000.00"))
+                .description("Test recurring rule")
+                .transactionPeriodType(period)
+                .recurringType(type)
+                .isActive(true)
                 .build());
     }
 }

@@ -28,6 +28,7 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -220,6 +221,44 @@ class RecurringRuleServiceImplTest {
 
         verify(expenseService, times(1)).save(any(), eq(true));
         verify(incomeRepository, times(1)).save(any());
+    }
+
+    // ── findById ─────────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("Should return recurring rule when found")
+    void findById_WhenRuleExists_ShouldReturnRule() {
+        User user = buildUser();
+        UUID id = UUID.randomUUID();
+        RecurringRule rule = RecurringRule.builder()
+                .id(id)
+                .owner(user)
+                .category(buildCategory(user))
+                .transactionDate(LocalDateTime.of(2026, 6, 5, 0, 0))
+                .price(new BigDecimal("5000.00"))
+                .description("Monthly salary")
+                .transactionPeriodType(TransactionPeriodType.MONTHLY)
+                .recurringType(RecurringType.INCOME)
+                .build();
+
+        doReturn(Optional.of(rule)).when(repository).findByOwnerIdAndId(user.getId(), id);
+
+        RecurringRule result = service.findById(user, id);
+
+        assertEquals(rule, result);
+        verify(repository, times(1)).findByOwnerIdAndId(user.getId(), id);
+    }
+
+    @Test
+    @DisplayName("Should throw NotFoundException when rule does not exist or belongs to another user")
+    void findById_WhenRuleNotFound_ShouldThrowNotFoundException() {
+        User user = buildUser();
+        UUID id = UUID.randomUUID();
+
+        doReturn(Optional.empty()).when(repository).findByOwnerIdAndId(user.getId(), id);
+
+        assertThrows(NotFoundException.class, () -> service.findById(user, id));
+        verify(repository, times(1)).findByOwnerIdAndId(user.getId(), id);
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────
