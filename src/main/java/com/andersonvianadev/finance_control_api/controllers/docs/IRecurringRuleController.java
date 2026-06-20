@@ -15,8 +15,12 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+
+import java.util.UUID;
 
 @Tag(
         name = "Recurring Rules",
@@ -193,5 +197,96 @@ public interface IRecurringRuleController {
                     )
             )
             @RequestBody @Valid RecurringRuleRequestDTO request
+    );
+
+    @GetMapping("/{id}")
+    @Operation(
+            summary = "Get a recurring rule by ID",
+            description = "Returns the recurring rule identified by the given ID. Only rules owned by the authenticated user are accessible.",
+            security = @SecurityRequirement(name = "bearerAuth"),
+            responses = {
+                    @ApiResponse(
+                            responseCode = "200",
+                            description = "Recurring rule found.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = RecurringRuleResponseDTO.class),
+                                    examples = @ExampleObject(
+                                            name = "Monthly income rule.",
+                                            value = """
+                                                    {
+                                                        "id": "a1b2c3d4-0000-1111-2222-333344445555",
+                                                        "transactionDate": "2026-06-05T00:00:00",
+                                                        "price": 5000.00,
+                                                        "description": "Monthly salary",
+                                                        "category": {
+                                                            "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+                                                            "name": "salary",
+                                                            "description": "Employment income",
+                                                            "icon": "wallet",
+                                                            "owner": {
+                                                                "id": "9cb12d90-4623-41c2-b3fc-1a963f77bcf1",
+                                                                "name": "Anderson",
+                                                                "email": "anderson@gmail.com"
+                                                            }
+                                                        },
+                                                        "owner": {
+                                                            "id": "9cb12d90-4623-41c2-b3fc-1a963f77bcf1",
+                                                            "name": "Anderson",
+                                                            "email": "anderson@gmail.com"
+                                                        },
+                                                        "transactionPeriodType": "MONTHLY",
+                                                        "recurringType": "INCOME",
+                                                        "isActive": true
+                                                    }
+                                                    """
+                                    )
+                            )
+                    ),
+                    @ApiResponse(
+                            responseCode = "404",
+                            description = "Recurring rule not found or does not belong to the authenticated user.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = StandardException.class),
+                                    examples = @ExampleObject(
+                                            name = "Rule not found.",
+                                            value = """
+                                                    {
+                                                        "timestamp": "2026-06-07T09:00:00Z",
+                                                        "status": 404,
+                                                        "error": "Recurring rule with id a1b2c3d4-0000-1111-2222-333344445555 not found",
+                                                        "path": "/nix-finance-api/recurring-rule/a1b2c3d4-0000-1111-2222-333344445555"
+                                                    }
+                                                    """
+                                    )
+                            )
+                    ),
+                    @ApiResponse(
+                            responseCode = "401",
+                            description = "Unauthorized. Missing or invalid JWT token.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = StandardException.class),
+                                    examples = @ExampleObject(
+                                            name = "Missing or invalid token.",
+                                            value = """
+                                                    {
+                                                        "timestamp": "2026-06-07T09:00:00Z",
+                                                        "status": 401,
+                                                        "error": "Unauthorized",
+                                                        "path": "/nix-finance-api/recurring-rule/a1b2c3d4-0000-1111-2222-333344445555"
+                                                    }
+                                                    """
+                                    )
+                            )
+                    )
+            }
+    )
+    ResponseEntity<RecurringRuleResponseDTO> findById(
+            @Parameter(hidden = true)
+            @AuthenticationPrincipal(expression = "user") User user,
+            @Parameter(description = "Recurring rule ID", required = true, example = "a1b2c3d4-0000-1111-2222-333344445555")
+            @PathVariable UUID id
     );
 }
