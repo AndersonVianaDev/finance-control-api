@@ -22,7 +22,9 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestParam;
 
+import java.time.LocalDate;
 import java.util.UUID;
 
 @Tag(
@@ -649,5 +651,89 @@ public interface IExpenseController {
                     )
             )
             @RequestBody @Valid ExpenseUpdateDTO request
+    );
+
+    @Operation(
+            summary = "List expenses by transaction date range",
+            description = """
+                    Returns a paginated list of the authenticated user's expenses whose transactionDate
+                    falls within the given date range (both start and finish are inclusive, covering the full day).
+
+                    Both parameters must be provided in ISO-8601 date format (yyyy-MM-dd).
+                    The filter covers the entirety of the finish day — expenses registered at any time
+                    on the finish date are included.
+                    """,
+            security = @SecurityRequirement(name = "bearerAuth"),
+            responses = {
+                    @ApiResponse(
+                            responseCode = "200",
+                            description = "Page of expenses within the range. May be empty if no expenses fall within the specified dates.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = PageResponseDTO.class),
+                                    examples = @ExampleObject(
+                                            name = "Page with one matching expense.",
+                                            value = """
+                                                    {
+                                                        "content": [
+                                                            {
+                                                                "id": "f1e2d3c4-9876-5432-fedc-ba0987654321",
+                                                                "transactionDate": "2026-06-15T10:00:00",
+                                                                "price": 150.00,
+                                                                "description": "Monthly gym membership",
+                                                                "category": {
+                                                                    "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+                                                                    "name": "Fitness",
+                                                                    "description": "Gym and sports expenses",
+                                                                    "icon": "fitness",
+                                                                    "owner": {
+                                                                        "id": "9cb12d90-4623-41c2-b3fc-1a963f77bcf1",
+                                                                        "name": "Anderson",
+                                                                        "email": "anderson@gmail.com"
+                                                                    }
+                                                                },
+                                                                "installmentNumber": null,
+                                                                "totalInstallments": null
+                                                            }
+                                                        ],
+                                                        "page": 0,
+                                                        "size": 10,
+                                                        "totalElement": 1,
+                                                        "totalPages": 1,
+                                                        "last": true
+                                                    }
+                                                    """
+                                    )
+                            )
+                    ),
+                    @ApiResponse(
+                            responseCode = "401",
+                            description = "Unauthorized. Missing or invalid JWT token.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = StandardException.class),
+                                    examples = @ExampleObject(
+                                            name = "Missing or invalid token.",
+                                            value = """
+                                                    {
+                                                        "timestamp": "2026-06-07T09:00:00Z",
+                                                        "status": 401,
+                                                        "error": "Unauthorized",
+                                                        "path": "/nix-finance-api/expenses"
+                                                    }
+                                                    """
+                                    )
+                            )
+                    )
+            }
+    )
+    ResponseEntity<PageResponseDTO<ExpenseResponseDTO>> findBetweenTransactionDate(
+            @Parameter(hidden = true)
+            @AuthenticationPrincipal(expression = "user") User user,
+            @Parameter(description = "Start date of the range (inclusive), format: yyyy-MM-dd", example = "2026-06-01")
+            @RequestParam(value = "start") LocalDate start,
+            @Parameter(description = "End date of the range (inclusive, full day), format: yyyy-MM-dd", example = "2026-06-30")
+            @RequestParam(value = "finish") LocalDate finish,
+            @PageableDefault(size = 10) Pageable pageable
     );
 }

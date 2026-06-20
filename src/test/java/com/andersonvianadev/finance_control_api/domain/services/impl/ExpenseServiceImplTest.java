@@ -619,6 +619,58 @@ class ExpenseServiceImplTest {
         assertThrows(ResourceAlreadyExistsException.class, () -> service.update(input, false));
     }
 
+    // ── findBetweenTransactionDate ───────────────────────────────────────────
+
+    @Test
+    @DisplayName("Should return page with expenses when expenses exist within the given date range")
+    void findBetweenTransactionDate_WhenExpensesExistInRange_ShouldReturnPage() {
+        User user = buildUser();
+        Category category = buildCategory(user);
+        Pageable pageable = PageRequest.of(0, 10);
+
+        LocalDateTime start = LocalDateTime.of(2026, 6, 1, 0, 0);
+        LocalDateTime finish = LocalDateTime.of(2026, 6, 30, 23, 59, 59, 999_999_999);
+
+        Expense expense = Expense.builder()
+                .id(UUID.randomUUID()).owner(user).category(category)
+                .transactionDate(LocalDateTime.of(2026, 6, 15, 10, 0))
+                .price(new BigDecimal("150.00")).description("Gym membership")
+                .build();
+
+        Page<Expense> expectedPage = new PageImpl<>(List.of(expense), pageable, 1);
+
+        doReturn(expectedPage).when(repository)
+                .findByOwnerIdAndTransactionDateBetween(user.getId(), start, finish, pageable);
+
+        Page<Expense> result = service.findBetweenTransactionDate(user, start, finish, pageable);
+
+        assertEquals(1, result.getTotalElements());
+        assertEquals(expense, result.getContent().getFirst());
+        verify(repository, times(1))
+                .findByOwnerIdAndTransactionDateBetween(user.getId(), start, finish, pageable);
+    }
+
+    @Test
+    @DisplayName("Should return empty page when no expenses exist within the given date range")
+    void findBetweenTransactionDate_WhenNoExpensesInRange_ShouldReturnEmptyPage() {
+        User user = buildUser();
+        Pageable pageable = PageRequest.of(0, 10);
+
+        LocalDateTime start = LocalDateTime.of(2026, 1, 1, 0, 0);
+        LocalDateTime finish = LocalDateTime.of(2026, 1, 31, 23, 59, 59, 999_999_999);
+
+        Page<Expense> emptyPage = new PageImpl<>(List.of(), pageable, 0);
+
+        doReturn(emptyPage).when(repository)
+                .findByOwnerIdAndTransactionDateBetween(user.getId(), start, finish, pageable);
+
+        Page<Expense> result = service.findBetweenTransactionDate(user, start, finish, pageable);
+
+        assertEquals(0, result.getTotalElements());
+        verify(repository, times(1))
+                .findByOwnerIdAndTransactionDateBetween(user.getId(), start, finish, pageable);
+    }
+
     // ── helpers ──────────────────────────────────────────────────────────────
 
     private User buildUser() {
