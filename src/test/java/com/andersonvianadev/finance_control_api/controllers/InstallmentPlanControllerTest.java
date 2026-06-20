@@ -800,6 +800,178 @@ class InstallmentPlanControllerTest {
         assertEquals(12, expenseRepository.count());
     }
 
+    // --- findBetweenFirstDueDate ---
+
+    @Test
+    @DisplayName("Should return only plans whose firstDueDate falls within the given range")
+    void findBetweenFirstDueDate_WhenPlansExistInRange_ShouldReturnOnlyMatchingPlans() throws Exception {
+        User userSaved = userService.save(
+                User.builder()
+                        .name("Anderson")
+                        .email("anderson@gmail.com")
+                        .password("Arthur@1406")
+                        .role(UserRole.ROLE_USER)
+                        .build()
+        );
+
+        Category categorySaved = categoryRepository.save(
+                Category.builder()
+                        .name("Technology")
+                        .description("Electronics and gadgets")
+                        .icon("tech")
+                        .owner(userSaved)
+                        .build()
+        );
+
+        UserPrincipal userPrincipal = new UserPrincipal(userSaved);
+
+        for (int i = 1; i <= 2; i++) {
+            InstallmentPlanRequestDTO request = new InstallmentPlanRequestDTO(
+                    new BigDecimal("6000.00"),
+                    2,
+                    LocalDate.of(2026, 5 + i, 1),
+                    "Plan in range " + i,
+                    categorySaved.getId()
+            );
+            mockMvc.perform(MockMvcRequestBuilders.post("/installment-plans")
+                            .with(user(userPrincipal))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(MockMvcResultMatchers.status().isAccepted());
+        }
+
+        mockMvc.perform(MockMvcRequestBuilders.post("/installment-plans")
+                        .with(user(userPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new InstallmentPlanRequestDTO(
+                                new BigDecimal("6000.00"),
+                                2,
+                                LocalDate.of(2026, 10, 1),
+                                "Plan out of range",
+                                categorySaved.getId()
+                        ))))
+                .andExpect(MockMvcResultMatchers.status().isAccepted());
+
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.get("/installment-plans")
+                        .param("start", "2026-06-01")
+                        .param("finish", "2026-08-01")
+                        .with(user(userPrincipal)))
+                .andExpect(MockMvcResultMatchers.status().isOk())
+                .andReturn();
+
+        tools.jackson.databind.JsonNode body = objectMapper.readTree(result.getResponse().getContentAsString());
+
+        assertEquals(2, body.get("totalElement").asInt());
+        assertEquals(2, body.get("content").size());
+        body.get("content").forEach(plan -> assertEquals(0, plan.get("expenses").size()));
+    }
+
+    @Test
+    @DisplayName("Should return empty page when no plans fall within the given date range")
+    void findBetweenFirstDueDate_WhenNoPlansInRange_ShouldReturnEmptyPage() throws Exception {
+        User userSaved = userService.save(
+                User.builder()
+                        .name("Anderson")
+                        .email("anderson@gmail.com")
+                        .password("Arthur@1406")
+                        .role(UserRole.ROLE_USER)
+                        .build()
+        );
+
+        Category categorySaved = categoryRepository.save(
+                Category.builder()
+                        .name("Technology")
+                        .description("Electronics and gadgets")
+                        .icon("tech")
+                        .owner(userSaved)
+                        .build()
+        );
+
+        UserPrincipal userPrincipal = new UserPrincipal(userSaved);
+
+        mockMvc.perform(MockMvcRequestBuilders.post("/installment-plans")
+                        .with(user(userPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new InstallmentPlanRequestDTO(
+                                new BigDecimal("6000.00"),
+                                2,
+                                LocalDate.of(2026, 12, 1),
+                                "Plan outside range",
+                                categorySaved.getId()
+                        ))))
+                .andExpect(MockMvcResultMatchers.status().isAccepted());
+
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.get("/installment-plans")
+                        .param("start", "2026-01-01")
+                        .param("finish", "2026-06-30")
+                        .with(user(userPrincipal)))
+                .andExpect(MockMvcResultMatchers.status().isOk())
+                .andReturn();
+
+        tools.jackson.databind.JsonNode body = objectMapper.readTree(result.getResponse().getContentAsString());
+
+        assertEquals(0, body.get("totalElement").asInt());
+        assertEquals(0, body.get("content").size());
+    }
+
+    @Test
+    @DisplayName("Should not return plans belonging to another user even if they fall within the range")
+    void findBetweenFirstDueDate_WhenPlansBelongToAnotherUser_ShouldReturnEmptyPage() throws Exception {
+        User owner = userService.save(
+                User.builder()
+                        .name("Anderson")
+                        .email("anderson@gmail.com")
+                        .password("Arthur@1406")
+                        .role(UserRole.ROLE_USER)
+                        .build()
+        );
+
+        User other = userService.save(
+                User.builder()
+                        .name("Other")
+                        .email("other@gmail.com")
+                        .password("Arthur@1406")
+                        .role(UserRole.ROLE_USER)
+                        .build()
+        );
+
+        Category categorySaved = categoryRepository.save(
+                Category.builder()
+                        .name("Technology")
+                        .description("Electronics and gadgets")
+                        .icon("tech")
+                        .owner(owner)
+                        .build()
+        );
+
+        UserPrincipal ownerPrincipal = new UserPrincipal(owner);
+        UserPrincipal otherPrincipal = new UserPrincipal(other);
+
+        mockMvc.perform(MockMvcRequestBuilders.post("/installment-plans")
+                        .with(user(ownerPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new InstallmentPlanRequestDTO(
+                                new BigDecimal("6000.00"),
+                                2,
+                                LocalDate.of(2026, 7, 1),
+                                "MacBook Pro 14",
+                                categorySaved.getId()
+                        ))))
+                .andExpect(MockMvcResultMatchers.status().isAccepted());
+
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.get("/installment-plans")
+                        .param("start", "2026-06-01")
+                        .param("finish", "2026-08-01")
+                        .with(user(otherPrincipal)))
+                .andExpect(MockMvcResultMatchers.status().isOk())
+                .andReturn();
+
+        tools.jackson.databind.JsonNode body = objectMapper.readTree(result.getResponse().getContentAsString());
+
+        assertEquals(0, body.get("totalElement").asInt());
+        assertEquals(0, body.get("content").size());
+    }
+
     @Test
     @DisplayName("Should return 400 when totalAmount is not positive")
     void create_WhenTotalAmountIsNotPositive_ShouldReturnBadRequest() throws Exception {

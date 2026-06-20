@@ -586,6 +586,74 @@ class InstallmentPlanServiceImplTest {
         verify(repository, never()).save(any());
     }
 
+    // --- findBetweenFirstDueDate() ---
+
+    @Test
+    @DisplayName("Should return page with plans when plans exist within the given date range")
+    void findBetweenFirstDueDate_WhenPlansExistInRange_ShouldReturnPage() {
+        User user = User.builder()
+                .id(UUID.randomUUID())
+                .name("Anderson")
+                .email("anderson@gmail.com")
+                .password("password")
+                .role(UserRole.ROLE_USER)
+                .build();
+
+        Pageable pageable = PageRequest.of(0, 10);
+        LocalDate start = LocalDate.of(2026, 6, 1);
+        LocalDate finish = LocalDate.of(2026, 8, 31);
+
+        InstallmentPlan plan = InstallmentPlan.builder()
+                .id(UUID.randomUUID())
+                .owner(user)
+                .description("MacBook Pro 14")
+                .totalAmount(new BigDecimal("18000.00"))
+                .installmentAmount(new BigDecimal("1500.00"))
+                .totalInstallments(12)
+                .status(InstallmentStatus.ACTIVE)
+                .firstDueDate(LocalDate.of(2026, 7, 1))
+                .build();
+
+        Page<InstallmentPlan> expectedPage = new PageImpl<>(List.of(plan), pageable, 1);
+
+        doReturn(expectedPage).when(repository)
+                .findByOwnerIdAndFirstDueDateBetween(user.getId(), start, finish, pageable);
+
+        Page<InstallmentPlan> result = service.findBetweenFirstDueDate(user, start, finish, pageable);
+
+        assertEquals(1, result.getTotalElements());
+        assertEquals(plan, result.getContent().get(0));
+        verify(repository, times(1))
+                .findByOwnerIdAndFirstDueDateBetween(user.getId(), start, finish, pageable);
+    }
+
+    @Test
+    @DisplayName("Should return empty page when no plans exist within the given date range")
+    void findBetweenFirstDueDate_WhenNoPlansInRange_ShouldReturnEmptyPage() {
+        User user = User.builder()
+                .id(UUID.randomUUID())
+                .name("Anderson")
+                .email("anderson@gmail.com")
+                .password("password")
+                .role(UserRole.ROLE_USER)
+                .build();
+
+        Pageable pageable = PageRequest.of(0, 10);
+        LocalDate start = LocalDate.of(2026, 1, 1);
+        LocalDate finish = LocalDate.of(2026, 1, 31);
+
+        Page<InstallmentPlan> emptyPage = new PageImpl<>(List.of(), pageable, 0);
+
+        doReturn(emptyPage).when(repository)
+                .findByOwnerIdAndFirstDueDateBetween(user.getId(), start, finish, pageable);
+
+        Page<InstallmentPlan> result = service.findBetweenFirstDueDate(user, start, finish, pageable);
+
+        assertEquals(0, result.getTotalElements());
+        verify(repository, times(1))
+                .findByOwnerIdAndFirstDueDateBetween(user.getId(), start, finish, pageable);
+    }
+
     @Test
     @DisplayName("Should forward skipBudget flag to each installment expense")
     void generateRemainingInstallments_WhenSkipBudgetIsTrue_ShouldPassFlagToExpenseService() {
