@@ -3,11 +3,15 @@ package com.andersonvianadev.finance_control_api.domain.services.impl;
 import com.andersonvianadev.finance_control_api.domain.models.Budget;
 import com.andersonvianadev.finance_control_api.domain.models.Category;
 import com.andersonvianadev.finance_control_api.domain.models.User;
+import com.andersonvianadev.finance_control_api.domain.models.dtos.PeriodDTO;
+import com.andersonvianadev.finance_control_api.domain.models.enums.BudgetType;
 import com.andersonvianadev.finance_control_api.domain.services.IBudgetService;
 import com.andersonvianadev.finance_control_api.domain.services.ICategoryService;
+import com.andersonvianadev.finance_control_api.infra.exceptions.BudgetExceededException;
 import com.andersonvianadev.finance_control_api.infra.exceptions.NotFoundException;
 import com.andersonvianadev.finance_control_api.infra.exceptions.ResourceAlreadyExistsException;
 import com.andersonvianadev.finance_control_api.infra.repositories.BudgetRepository;
+import com.andersonvianadev.finance_control_api.infra.repositories.ExpenseRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -15,6 +19,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
+import java.util.Optional;
 import java.util.UUID;
 
 @Slf4j
@@ -24,6 +30,7 @@ public class BudgetServiceImpl implements IBudgetService {
 
     private final BudgetRepository repository;
     private final ICategoryService categoryService;
+    private final ExpenseRepository expenseRepository;
 
     @Override
     public Budget save(Budget budget) {
@@ -93,5 +100,48 @@ public class BudgetServiceImpl implements IBudgetService {
     @Override
     public Page<Budget> findAll(User owner, Pageable pageable) {
         return repository.findByOwner(owner, pageable);
+    }
+
+    @Override
+    public void validateTransactionRespectsBudget(User owner, Category category, BigDecimal valueTransaction) {
+        UUID ownerId = owner.getId();
+        UUID categoryId = category.getId();
+
+        Optional<Budget> budgetOptional = repository.findByOwnerIdAndCategoryIdAndActiveTrue(ownerId, categoryId);
+
+        if(budgetOptional.isPresent()) {
+            Budget budget = budgetOptional.get();
+            BudgetType budgetType = budget.getBudgetType();
+
+            PeriodDTO period = budgetType.getPeriod();
+            BigDecimal totalSpent = expenseRepository.sumByOwnerAndCategoryAndDateRange(
+                    ownerId, categoryId, period.startDate(), period.endDate());
+
+            if (totalSpent.add(valueTransaction).compareTo(budget.getLimitAmount()) > 0) {
+                throw new BudgetExceededException("Budget limit exceeded for category: " + category.getName());
+            }
+        }
+    }
+
+    @Override
+    public void validateTransactionRespectsBudgetOnUpdate(User owner, Category category, BigDecimal oldPrice, BigDecimal newPrice) {
+        UUID ownerId = owner.getId();
+        UUID categoryId = category.getId();
+
+        Optional<Budget> budgetOptional = repository.findByOwnerIdAndCategoryIdAndActiveTrue(ownerId, categoryId);
+
+        if(budgetOptional.isPresent()) {
+            Budget budget = budgetOptional.get();
+            BudgetType budgetType = budget.getBudgetType();
+
+            PeriodDTO period = budgetType.getPeriod();
+            BigDecimal totalSpent = expenseRepository.sumByOwnerAndCategoryAndDateRange(
+                    ownerId, categoryId, period.startDate(), period.endDate());
+
+            // totalSpent includes the expense with oldPrice; subtract it and add newPrice for the actual projected total
+            if(totalSpent.subtract(oldPrice).add(newPrice).compareTo(budget.getLimitAmount()) > 0) {
+                throw new BudgetExceededException("Budget limit exceeded for category: " + category.getName());
+            }
+        }
     }
 }

@@ -13,6 +13,10 @@ import com.andersonvianadev.finance_control_api.domain.services.IUserService;
 import com.andersonvianadev.finance_control_api.infra.exceptions.StandardException;
 import com.andersonvianadev.finance_control_api.infra.repositories.BudgetRepository;
 import com.andersonvianadev.finance_control_api.infra.repositories.CategoryRepository;
+import com.andersonvianadev.finance_control_api.infra.repositories.ExpenseRepository;
+import com.andersonvianadev.finance_control_api.infra.repositories.IncomeRepository;
+import com.andersonvianadev.finance_control_api.infra.repositories.InstallmentPlanRepository;
+import com.andersonvianadev.finance_control_api.infra.repositories.RecurringRuleRepository;
 import com.andersonvianadev.finance_control_api.infra.repositories.UserRepository;
 import com.andersonvianadev.finance_control_api.infra.security.UserPrincipal;
 import org.junit.jupiter.api.BeforeEach;
@@ -61,9 +65,25 @@ class BudgetControllerTest {
     @Autowired
     private BudgetRepository budgetRepository;
 
+    @Autowired
+    private ExpenseRepository expenseRepository;
+
+    @Autowired
+    private IncomeRepository incomeRepository;
+
+    @Autowired
+    private InstallmentPlanRepository installmentPlanRepository;
+
+    @Autowired
+    private RecurringRuleRepository recurringRuleRepository;
+
     @BeforeEach
     void setup() {
+        incomeRepository.deleteAll();
+        expenseRepository.deleteAll();
+        installmentPlanRepository.deleteAll();
         budgetRepository.deleteAll();
+        recurringRuleRepository.deleteAll();
         categoryRepository.deleteAll();
         userRepository.deleteAll();
     }
@@ -112,6 +132,7 @@ class BudgetControllerTest {
         BudgetResponseDTO response = objectMapper.readValue(content, BudgetResponseDTO.class);
 
         assertNotNull(response);
+        assertNotNull(response.id());
         assertEquals(userSaved.getId(), response.user().id());
         assertEquals(categorySaved.getId(), response.category().id());
         assertEquals(request.budgetType(), response.budgetType());
@@ -302,6 +323,7 @@ class BudgetControllerTest {
         BudgetResponseDTO response = objectMapper.readValue(content, BudgetResponseDTO.class);
 
         assertNotNull(response);
+        assertEquals(budgetSaved.getId(), response.id());
         assertEquals(userSaved.getId(), response.user().id());
         assertEquals(categorySaved.getId(), response.category().id());
         assertEquals(budgetSaved.getBudgetType(), response.budgetType());
@@ -445,6 +467,7 @@ class BudgetControllerTest {
 
         BudgetResponseDTO response = objectMapper.readValue(content, BudgetResponseDTO.class);
 
+        assertEquals(budgetSaved.getId(), response.id());
         assertEquals(update.budgetType(), response.budgetType());
         assertEquals(0, update.limitAmount().compareTo(response.limitAmount()));
         assertEquals(update.active(), response.active());
@@ -676,6 +699,7 @@ class BudgetControllerTest {
         PageResponseDTO<BudgetResponseDTO> response = objectMapper.readValue(content, pageType);
 
         assertEquals(2, response.content().size());
+        response.content().forEach(b -> assertNotNull(b.id()));
         assertEquals(0, response.page());
         assertEquals(10, response.size());
         assertEquals(2, response.totalElement());

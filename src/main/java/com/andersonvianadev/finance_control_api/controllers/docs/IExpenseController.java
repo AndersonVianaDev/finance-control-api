@@ -1,0 +1,739 @@
+package com.andersonvianadev.finance_control_api.controllers.docs;
+
+import com.andersonvianadev.finance_control_api.controllers.dtos.requests.ExpenseRequestDTO;
+import com.andersonvianadev.finance_control_api.controllers.dtos.requests.ExpenseUpdateDTO;
+import com.andersonvianadev.finance_control_api.controllers.dtos.responses.ExpenseResponseDTO;
+import com.andersonvianadev.finance_control_api.controllers.dtos.responses.PageResponseDTO;
+import com.andersonvianadev.finance_control_api.domain.models.User;
+import com.andersonvianadev.finance_control_api.infra.exceptions.StandardException;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestParam;
+
+import java.time.LocalDate;
+import java.util.UUID;
+
+@Tag(
+        name = "Expenses",
+        description = "Operations for expense transactions"
+)
+public interface IExpenseController {
+
+    @Operation(
+            summary = "Register expense",
+            description = """
+                    Registers a new expense for the authenticated user.
+
+                    The category must belong to the user or be a global category.
+                    Duplicate expenses (same owner, category, date, price and description) are rejected.
+                    Budget validation is applied by default; send X-SKIP-BUDGET: true to bypass it.
+                    For installment expenses, the transaction date is automatically adjusted to the next banking working day if it falls on a non-working day.
+                    """,
+            security = @SecurityRequirement(name = "bearerAuth"),
+            responses = {
+                    @ApiResponse(
+                            responseCode = "201",
+                            description = "Expense registered successfully.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = ExpenseResponseDTO.class),
+                                    examples = @ExampleObject(
+                                            name = "Expense created.",
+                                            value = """
+                                                    {
+                                                        "id": "f1e2d3c4-9876-5432-fedc-ba0987654321",
+                                                        "transactionDate": "2026-06-13T10:00:00",
+                                                        "price": 150.00,
+                                                        "description": "Monthly gym membership",
+                                                        "category": {
+                                                            "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+                                                            "name": "Fitness",
+                                                            "description": "Gym and sports expenses",
+                                                            "icon": "fitness",
+                                                            "owner": {
+                                                                "id": "9cb12d90-4623-41c2-b3fc-1a963f77bcf1",
+                                                                "name": "Anderson",
+                                                                "email": "anderson@gmail.com"
+                                                            }
+                                                        },
+                                                        "installmentNumber": null,
+                                                        "totalInstallments": null
+                                                    }
+                                                    """
+                                    )
+                            )
+                    ),
+                    @ApiResponse(
+                            responseCode = "409",
+                            description = "Duplicate expense already registered.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = StandardException.class),
+                                    examples = @ExampleObject(
+                                            name = "Expense already registered.",
+                                            value = """
+                                                    {
+                                                        "timestamp": "2026-06-07T09:00:00Z",
+                                                        "status": 409,
+                                                        "error": "Expense already registered",
+                                                        "path": "/nix-finance-api/expenses"
+                                                    }
+                                                    """
+                                    )
+                            )
+                    ),
+                    @ApiResponse(
+                            responseCode = "404",
+                            description = "Category not found or not accessible by the user.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = StandardException.class),
+                                    examples = @ExampleObject(
+                                            name = "Category not found.",
+                                            value = """
+                                                    {
+                                                        "timestamp": "2026-06-07T09:00:00Z",
+                                                        "status": 404,
+                                                        "error": "Category not found.",
+                                                        "path": "/nix-finance-api/expenses"
+                                                    }
+                                                    """
+                                    )
+                            )
+                    ),
+                    @ApiResponse(
+                            responseCode = "400",
+                            description = "Invalid field value.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = StandardException.class),
+                                    examples = @ExampleObject(
+                                            name = "Missing required field.",
+                                            value = """
+                                                    {
+                                                        "timestamp": "2026-06-07T09:00:00Z",
+                                                        "status": 400,
+                                                        "error": "categoryId must not be null.",
+                                                        "path": "/nix-finance-api/expenses"
+                                                    }
+                                                    """
+                                    )
+                            )
+                    ),
+                    @ApiResponse(
+                            responseCode = "401",
+                            description = "Unauthorized. Missing or invalid JWT token.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = StandardException.class),
+                                    examples = @ExampleObject(
+                                            name = "Missing or invalid token.",
+                                            value = """
+                                                    {
+                                                        "timestamp": "2026-06-07T09:00:00Z",
+                                                        "status": 401,
+                                                        "error": "Unauthorized",
+                                                        "path": "/nix-finance-api/expenses"
+                                                    }
+                                                    """
+                                    )
+                            )
+                    ),
+                    @ApiResponse(
+                            responseCode = "502",
+                            description = "Calendar API unavailable. Applies only to installment expenses when the banking working day check cannot be performed.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = StandardException.class),
+                                    examples = @ExampleObject(
+                                            name = "Calendar API unavailable.",
+                                            value = """
+                                                    {
+                                                        "timestamp": "2026-06-07T09:00:00Z",
+                                                        "status": 502,
+                                                        "error": "External service unavailable: calendar-api",
+                                                        "path": "/nix-finance-api/expenses"
+                                                    }
+                                                    """
+                                    )
+                            )
+                    )
+            }
+    )
+    ResponseEntity<ExpenseResponseDTO> save(
+            @Parameter(hidden = true)
+            @AuthenticationPrincipal(expression = "user") User user,
+            @Parameter(
+                    description = "When true, skips budget limit validation for this expense.",
+                    example = "false"
+            )
+            @RequestHeader(value = "X-SKIP-BUDGET", required = false, defaultValue = "false") boolean skipBudget,
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = """
+                            Data required to register the expense.
+                            Validation rules:
+                                - transactionDate: required
+                                - price: required
+                                - description: required
+                                - categoryId: required, must belong to the user or be a global category
+                            """,
+                    required = true,
+                    content = @Content(
+                            schema = @Schema(implementation = ExpenseRequestDTO.class),
+                            examples = @ExampleObject(
+                                    name = "Valid expense.",
+                                    value = """
+                                            {
+                                                "transactionDate": "2026-06-13T10:00:00",
+                                                "price": 150.00,
+                                                "description": "Monthly gym membership",
+                                                "categoryId": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+                                            }
+                                            """
+                            )
+                    )
+            )
+            @RequestBody @Valid ExpenseRequestDTO request
+    );
+
+    @Operation(
+            summary = "Find expense by ID",
+            description = """
+                    Returns a single expense by its ID.
+
+                    The expense must belong to the authenticated user.
+                    """,
+            security = @SecurityRequirement(name = "bearerAuth"),
+            responses = {
+                    @ApiResponse(
+                            responseCode = "200",
+                            description = "Expense found successfully.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = ExpenseResponseDTO.class),
+                                    examples = @ExampleObject(
+                                            name = "Expense found.",
+                                            value = """
+                                                    {
+                                                        "id": "f1e2d3c4-9876-5432-fedc-ba0987654321",
+                                                        "transactionDate": "2026-06-13T10:00:00",
+                                                        "price": 150.00,
+                                                        "description": "Monthly gym membership",
+                                                        "category": {
+                                                            "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+                                                            "name": "Fitness",
+                                                            "description": "Gym and sports expenses",
+                                                            "icon": "fitness",
+                                                            "owner": {
+                                                                "id": "9cb12d90-4623-41c2-b3fc-1a963f77bcf1",
+                                                                "name": "Anderson",
+                                                                "email": "anderson@gmail.com"
+                                                            }
+                                                        },
+                                                        "installmentNumber": null,
+                                                        "totalInstallments": null
+                                                    }
+                                                    """
+                                    )
+                            )
+                    ),
+                    @ApiResponse(
+                            responseCode = "404",
+                            description = "Expense not found or does not belong to the authenticated user.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = StandardException.class),
+                                    examples = @ExampleObject(
+                                            name = "Expense not found.",
+                                            value = """
+                                                    {
+                                                        "timestamp": "2026-06-07T09:00:00Z",
+                                                        "status": 404,
+                                                        "error": "Expense not found.",
+                                                        "path": "/nix-finance-api/expenses/{id}"
+                                                    }
+                                                    """
+                                    )
+                            )
+                    ),
+                    @ApiResponse(
+                            responseCode = "401",
+                            description = "Unauthorized. Missing or invalid JWT token.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = StandardException.class),
+                                    examples = @ExampleObject(
+                                            name = "Missing or invalid token.",
+                                            value = """
+                                                    {
+                                                        "timestamp": "2026-06-07T09:00:00Z",
+                                                        "status": 401,
+                                                        "error": "Unauthorized",
+                                                        "path": "/nix-finance-api/expenses/{id}"
+                                                    }
+                                                    """
+                                    )
+                            )
+                    )
+            }
+    )
+    ResponseEntity<ExpenseResponseDTO> findById(
+            @Parameter(hidden = true)
+            @AuthenticationPrincipal(expression = "user") User user,
+            @Parameter(description = "Expense UUID.", required = true)
+            @PathVariable UUID id
+    );
+
+    @Operation(
+            summary = "List expenses",
+            description = """
+                    Returns a paginated list of expenses belonging to the authenticated user.
+                    Pagination query parameters:
+                        - page: page number (0-indexed, default: 0)
+                        - size: page size (default: 10)
+                        - sort: sorting criteria (e.g. sort=transactionDate,desc)
+                    """,
+            security = @SecurityRequirement(name = "bearerAuth"),
+            responses = {
+                    @ApiResponse(
+                            responseCode = "200",
+                            description = "Expenses retrieved successfully.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = PageResponseDTO.class),
+                                    examples = @ExampleObject(
+                                            name = "Expenses page.",
+                                            value = """
+                                                    {
+                                                        "content": [
+                                                            {
+                                                                "id": "f1e2d3c4-9876-5432-fedc-ba0987654321",
+                                                                "transactionDate": "2026-06-13T10:00:00",
+                                                                "price": 150.00,
+                                                                "description": "Monthly gym membership",
+                                                                "category": {
+                                                                    "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+                                                                    "name": "Fitness",
+                                                                    "description": "Gym and sports expenses",
+                                                                    "icon": "fitness",
+                                                                    "owner": {
+                                                                        "id": "9cb12d90-4623-41c2-b3fc-1a963f77bcf1",
+                                                                        "name": "Anderson",
+                                                                        "email": "anderson@gmail.com"
+                                                                    }
+                                                                },
+                                                                "installmentNumber": null,
+                                                                "totalInstallments": null
+                                                            }
+                                                        ],
+                                                        "page": 0,
+                                                        "size": 10,
+                                                        "totalElement": 1,
+                                                        "totalPages": 1,
+                                                        "last": true
+                                                    }
+                                                    """
+                                    )
+                            )
+                    ),
+                    @ApiResponse(
+                            responseCode = "401",
+                            description = "Unauthorized. Missing or invalid JWT token.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = StandardException.class),
+                                    examples = @ExampleObject(
+                                            name = "Missing or invalid token.",
+                                            value = """
+                                                    {
+                                                        "timestamp": "2026-06-07T09:00:00Z",
+                                                        "status": 401,
+                                                        "error": "Unauthorized",
+                                                        "path": "/nix-finance-api/expenses"
+                                                    }
+                                                    """
+                                    )
+                            )
+                    )
+            }
+    )
+    ResponseEntity<PageResponseDTO<ExpenseResponseDTO>> findAll(
+            @Parameter(hidden = true)
+            @AuthenticationPrincipal(expression = "user") User user,
+            @PageableDefault(size = 10) Pageable pageable
+    );
+
+    @Operation(
+            summary = "Delete expense by ID",
+            description = """
+                    Permanently deletes an expense by its ID.
+
+                    The expense must belong to the authenticated user.
+                    Expenses linked to an installment plan cannot be deleted individually — cancel the entire plan instead.
+                    """,
+            security = @SecurityRequirement(name = "bearerAuth"),
+            responses = {
+                    @ApiResponse(
+                            responseCode = "204",
+                            description = "Expense deleted successfully.",
+                            content = @Content
+                    ),
+                    @ApiResponse(
+                            responseCode = "422",
+                            description = "Expense is linked to an installment plan and cannot be deleted individually.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = StandardException.class),
+                                    examples = @ExampleObject(
+                                            name = "Installment expense deletion blocked.",
+                                            value = """
+                                                    {
+                                                        "timestamp": "2026-06-07T09:00:00Z",
+                                                        "status": 422,
+                                                        "error": "The user can only cancel the entire installment plan",
+                                                        "path": "/nix-finance-api/expenses/{id}"
+                                                    }
+                                                    """
+                                    )
+                            )
+                    ),
+                    @ApiResponse(
+                            responseCode = "404",
+                            description = "Expense not found or does not belong to the authenticated user.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = StandardException.class),
+                                    examples = @ExampleObject(
+                                            name = "Expense not found.",
+                                            value = """
+                                                    {
+                                                        "timestamp": "2026-06-07T09:00:00Z",
+                                                        "status": 404,
+                                                        "error": "Expense not found.",
+                                                        "path": "/nix-finance-api/expenses/{id}"
+                                                    }
+                                                    """
+                                    )
+                            )
+                    ),
+                    @ApiResponse(
+                            responseCode = "401",
+                            description = "Unauthorized. Missing or invalid JWT token.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = StandardException.class),
+                                    examples = @ExampleObject(
+                                            name = "Missing or invalid token.",
+                                            value = """
+                                                    {
+                                                        "timestamp": "2026-06-07T09:00:00Z",
+                                                        "status": 401,
+                                                        "error": "Unauthorized",
+                                                        "path": "/nix-finance-api/expenses/{id}"
+                                                    }
+                                                    """
+                                    )
+                            )
+                    )
+            }
+    )
+    ResponseEntity<Void> delete(
+            @Parameter(hidden = true)
+            @AuthenticationPrincipal(expression = "user") User user,
+            @Parameter(description = "Expense UUID.", required = true)
+            @PathVariable UUID id
+    );
+
+    @Operation(
+            summary = "Update expense",
+            description = """
+                    Updates an existing expense for the authenticated user.
+
+                    All fields are optional — only provided fields are applied.
+                    Expenses linked to an installment plan cannot be updated individually.
+                    Duplicate check is applied after mutation, excluding the expense itself.
+                    Budget is re-validated only when price or category changes:
+                        - Category change: full new price is validated against the new category budget.
+                        - Price increase (same category): only the delta is validated.
+                        - Price decrease or description/date-only change: no budget check.
+                    Send X-SKIP-BUDGET: true to bypass budget validation entirely.
+                    """,
+            security = @SecurityRequirement(name = "bearerAuth"),
+            responses = {
+                    @ApiResponse(
+                            responseCode = "200",
+                            description = "Expense updated successfully.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = ExpenseResponseDTO.class),
+                                    examples = @ExampleObject(
+                                            name = "Expense updated.",
+                                            value = """
+                                                    {
+                                                        "id": "f1e2d3c4-9876-5432-fedc-ba0987654321",
+                                                        "transactionDate": "2026-06-13T10:00:00",
+                                                        "price": 175.00,
+                                                        "description": "Updated gym membership",
+                                                        "category": {
+                                                            "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+                                                            "name": "Fitness",
+                                                            "description": "Gym and sports expenses",
+                                                            "icon": "fitness",
+                                                            "owner": {
+                                                                "id": "9cb12d90-4623-41c2-b3fc-1a963f77bcf1",
+                                                                "name": "Anderson",
+                                                                "email": "anderson@gmail.com"
+                                                            }
+                                                        },
+                                                        "installmentNumber": null,
+                                                        "totalInstallments": null
+                                                    }
+                                                    """
+                                    )
+                            )
+                    ),
+                    @ApiResponse(
+                            responseCode = "422",
+                            description = "Expense is linked to an installment plan and cannot be updated individually.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = StandardException.class),
+                                    examples = @ExampleObject(
+                                            name = "Installment expense update blocked.",
+                                            value = """
+                                                    {
+                                                        "timestamp": "2026-06-07T09:00:00Z",
+                                                        "status": 422,
+                                                        "error": "The user can only update the installment plan in full.",
+                                                        "path": "/nix-finance-api/expenses/{id}"
+                                                    }
+                                                    """
+                                    )
+                            )
+                    ),
+                    @ApiResponse(
+                            responseCode = "422",
+                            description = "Price or category change exceeds active budget limit.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = StandardException.class),
+                                    examples = @ExampleObject(
+                                            name = "Budget exceeded.",
+                                            value = """
+                                                    {
+                                                        "timestamp": "2026-06-07T09:00:00Z",
+                                                        "status": 422,
+                                                        "error": "Budget limit exceeded for category: Fitness",
+                                                        "path": "/nix-finance-api/expenses/{id}"
+                                                    }
+                                                    """
+                                    )
+                            )
+                    ),
+                    @ApiResponse(
+                            responseCode = "409",
+                            description = "Updated values conflict with another existing expense.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = StandardException.class),
+                                    examples = @ExampleObject(
+                                            name = "Duplicate expense.",
+                                            value = """
+                                                    {
+                                                        "timestamp": "2026-06-07T09:00:00Z",
+                                                        "status": 409,
+                                                        "error": "Expense already registered",
+                                                        "path": "/nix-finance-api/expenses/{id}"
+                                                    }
+                                                    """
+                                    )
+                            )
+                    ),
+                    @ApiResponse(
+                            responseCode = "404",
+                            description = "Expense not found or does not belong to the authenticated user.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = StandardException.class),
+                                    examples = @ExampleObject(
+                                            name = "Expense not found.",
+                                            value = """
+                                                    {
+                                                        "timestamp": "2026-06-07T09:00:00Z",
+                                                        "status": 404,
+                                                        "error": "Expense not found.",
+                                                        "path": "/nix-finance-api/expenses/{id}"
+                                                    }
+                                                    """
+                                    )
+                            )
+                    ),
+                    @ApiResponse(
+                            responseCode = "404",
+                            description = "New category not found or not accessible by the user.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = StandardException.class),
+                                    examples = @ExampleObject(
+                                            name = "Category not found.",
+                                            value = """
+                                                    {
+                                                        "timestamp": "2026-06-07T09:00:00Z",
+                                                        "status": 404,
+                                                        "error": "Category not found.",
+                                                        "path": "/nix-finance-api/expenses/{id}"
+                                                    }
+                                                    """
+                                    )
+                            )
+                    ),
+                    @ApiResponse(
+                            responseCode = "401",
+                            description = "Unauthorized. Missing or invalid JWT token.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = StandardException.class),
+                                    examples = @ExampleObject(
+                                            name = "Missing or invalid token.",
+                                            value = """
+                                                    {
+                                                        "timestamp": "2026-06-07T09:00:00Z",
+                                                        "status": 401,
+                                                        "error": "Unauthorized",
+                                                        "path": "/nix-finance-api/expenses/{id}"
+                                                    }
+                                                    """
+                                    )
+                            )
+                    )
+            }
+    )
+    ResponseEntity<ExpenseResponseDTO> update(
+            @Parameter(hidden = true)
+            @AuthenticationPrincipal(expression = "user") User user,
+            @Parameter(
+                    description = "When true, skips budget limit validation for this update.",
+                    example = "false"
+            )
+            @RequestHeader(value = "X-SKIP-BUDGET", required = false, defaultValue = "false") boolean skipBudget,
+            @Parameter(description = "Expense UUID.", required = true)
+            @PathVariable UUID id,
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = """
+                            Fields to update. All fields are optional — only provided fields are applied.
+                            """,
+                    required = true,
+                    content = @Content(
+                            schema = @Schema(implementation = ExpenseUpdateDTO.class),
+                            examples = @ExampleObject(
+                                    name = "Partial update.",
+                                    value = """
+                                            {
+                                                "price": 175.00,
+                                                "description": "Updated gym membership"
+                                            }
+                                            """
+                            )
+                    )
+            )
+            @RequestBody @Valid ExpenseUpdateDTO request
+    );
+
+    @Operation(
+            summary = "List expenses by transaction date range",
+            description = """
+                    Returns a paginated list of the authenticated user's expenses whose transactionDate
+                    falls within the given date range (both start and finish are inclusive, covering the full day).
+
+                    Both parameters must be provided in ISO-8601 date format (yyyy-MM-dd).
+                    The filter covers the entirety of the finish day — expenses registered at any time
+                    on the finish date are included.
+                    """,
+            security = @SecurityRequirement(name = "bearerAuth"),
+            responses = {
+                    @ApiResponse(
+                            responseCode = "200",
+                            description = "Page of expenses within the range. May be empty if no expenses fall within the specified dates.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = PageResponseDTO.class),
+                                    examples = @ExampleObject(
+                                            name = "Page with one matching expense.",
+                                            value = """
+                                                    {
+                                                        "content": [
+                                                            {
+                                                                "id": "f1e2d3c4-9876-5432-fedc-ba0987654321",
+                                                                "transactionDate": "2026-06-15T10:00:00",
+                                                                "price": 150.00,
+                                                                "description": "Monthly gym membership",
+                                                                "category": {
+                                                                    "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+                                                                    "name": "Fitness",
+                                                                    "description": "Gym and sports expenses",
+                                                                    "icon": "fitness",
+                                                                    "owner": {
+                                                                        "id": "9cb12d90-4623-41c2-b3fc-1a963f77bcf1",
+                                                                        "name": "Anderson",
+                                                                        "email": "anderson@gmail.com"
+                                                                    }
+                                                                },
+                                                                "installmentNumber": null,
+                                                                "totalInstallments": null
+                                                            }
+                                                        ],
+                                                        "page": 0,
+                                                        "size": 10,
+                                                        "totalElement": 1,
+                                                        "totalPages": 1,
+                                                        "last": true
+                                                    }
+                                                    """
+                                    )
+                            )
+                    ),
+                    @ApiResponse(
+                            responseCode = "401",
+                            description = "Unauthorized. Missing or invalid JWT token.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = StandardException.class),
+                                    examples = @ExampleObject(
+                                            name = "Missing or invalid token.",
+                                            value = """
+                                                    {
+                                                        "timestamp": "2026-06-07T09:00:00Z",
+                                                        "status": 401,
+                                                        "error": "Unauthorized",
+                                                        "path": "/nix-finance-api/expenses"
+                                                    }
+                                                    """
+                                    )
+                            )
+                    )
+            }
+    )
+    ResponseEntity<PageResponseDTO<ExpenseResponseDTO>> findBetweenTransactionDate(
+            @Parameter(hidden = true)
+            @AuthenticationPrincipal(expression = "user") User user,
+            @Parameter(description = "Start date of the range (inclusive), format: yyyy-MM-dd", example = "2026-06-01")
+            @RequestParam(value = "start") LocalDate start,
+            @Parameter(description = "End date of the range (inclusive, full day), format: yyyy-MM-dd", example = "2026-06-30")
+            @RequestParam(value = "finish") LocalDate finish,
+            @PageableDefault(size = 10) Pageable pageable
+    );
+}

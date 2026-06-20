@@ -16,4 +16,5 @@ public interface BudgetRepository extends JpaRepository<Budget, UUID> {
     boolean existsByCategoryAndOwner(Category category, User owner);
     Optional<Budget> findByIdAndOwner(UUID id, User owner);
     Page<Budget> findByOwner(User owner, Pageable pageable);
+    Optional<Budget> findByOwnerIdAndCategoryIdAndActiveTrue(UUID ownerId, UUID categoryId);
 }
