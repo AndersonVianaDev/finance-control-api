@@ -57,7 +57,7 @@ public class InstallmentPlanServiceImpl implements IInstallmentPlanService {
                 .installmentNumber(1)
                 .build();
 
-        Expense savedFirstExpense = expenseService.save(firstExpense, skipBudget);
+        Expense savedFirstExpense = expenseService.save(firstExpense, false, skipBudget);
 
         log.info("InstallmentPlan id={} created. Enqueueing generation for installments 2..{}",
                 savedPlan.getId(), savedPlan.getTotalInstallments());
@@ -87,7 +87,7 @@ public class InstallmentPlanServiceImpl implements IInstallmentPlanService {
                         .installmentNumber(i)
                         .build();
 
-                expenseService.save(installment, skipBudget);
+                expenseService.save(installment, false, skipBudget);
 
                 log.debug("Installment {}/{} created for plan id={}", i, plan.getTotalInstallments(), plan.getId());
             } catch (ExternalServiceException e) {

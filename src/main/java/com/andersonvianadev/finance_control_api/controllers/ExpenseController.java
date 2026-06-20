@@ -39,7 +39,7 @@ public class ExpenseController implements IExpenseController {
             @RequestBody @Valid ExpenseRequestDTO request) {
 
         Expense expense = ExpenseMapper.toDomain(user, request);
-        Expense saved = service.save(expense, skipBudget);
+        Expense saved = service.save(expense, false, skipBudget);
         return ResponseEntity.status(HttpStatus.CREATED).body(ExpenseMapper.toResponse(saved));
     }
 

@@ -77,7 +77,7 @@ class ExpenseServiceImplTest {
         doReturn(false).when(repository).existsDuplicate(user.getId(), category.getId(), expense.getPrice(), date, expense.getDescription());
         doReturn(saved).when(repository).save(expense);
 
-        Expense result = service.save(expense, false);
+        Expense result = service.save(expense, false, false);
 
         verify(calendarService, never()).getDate(any());
         verify(budgetService, times(1)).validateTransactionRespectsBudget(user, category, expense.getPrice());
@@ -99,7 +99,7 @@ class ExpenseServiceImplTest {
         doReturn(false).when(repository).existsDuplicate(user.getId(), category.getId(), expense.getPrice(), date, expense.getDescription());
         doReturn(saved).when(repository).save(expense);
 
-        service.save(expense, true);
+        service.save(expense, false, true);
 
         verify(calendarService, never()).getDate(any());
         verify(budgetService, never()).validateTransactionRespectsBudget(any(), any(), any());
@@ -117,7 +117,7 @@ class ExpenseServiceImplTest {
         doThrow(new NotFoundException("Category not found."))
                 .when(categoryService).findByIdAndOwnerOrOwnerIsNull(categoryId, user);
 
-        assertThrows(NotFoundException.class, () -> service.save(expense, false));
+        assertThrows(NotFoundException.class, () -> service.save(expense, false, false));
 
         verify(calendarService, never()).getDate(any());
         verify(repository, never()).existsDuplicate(any(), any(), any(), any(), any());
@@ -136,7 +136,7 @@ class ExpenseServiceImplTest {
         doReturn(category).when(categoryService).findByIdAndOwnerOrOwnerIsNull(category.getId(), user);
         doReturn(true).when(repository).existsDuplicate(user.getId(), category.getId(), expense.getPrice(), date, expense.getDescription());
 
-        assertThrows(ResourceAlreadyExistsException.class, () -> service.save(expense, false));
+        assertThrows(ResourceAlreadyExistsException.class, () -> service.save(expense, false, false));
 
         verify(calendarService, never()).getDate(any());
         verify(budgetService, never()).validateTransactionRespectsBudget(any(), any(), any());
@@ -156,7 +156,7 @@ class ExpenseServiceImplTest {
         doReturn(false).when(repository).existsDuplicate(user.getId(), category.getId(), expense.getPrice(), date, expense.getDescription());
         doThrow(new DataIntegrityViolationException("duplicate")).when(repository).save(expense);
 
-        assertThrows(ResourceAlreadyExistsException.class, () -> service.save(expense, false));
+        assertThrows(ResourceAlreadyExistsException.class, () -> service.save(expense, false, false));
 
         verify(repository, times(1)).save(expense);
     }
@@ -177,7 +177,7 @@ class ExpenseServiceImplTest {
         doReturn(calendarDTO).when(calendarService).getDate(date.toLocalDate());
         doReturn(Expense.builder().id(UUID.randomUUID()).build()).when(repository).save(expense);
 
-        service.save(expense, true);
+        service.save(expense, false, true);
 
         assertEquals(date, expense.getTransactionDate());
         verify(calendarService, times(1)).getDate(date.toLocalDate());
@@ -199,10 +199,57 @@ class ExpenseServiceImplTest {
         doReturn(calendarDTO).when(calendarService).getDate(nonWorkingDate.toLocalDate());
         doReturn(Expense.builder().id(UUID.randomUUID()).build()).when(repository).save(expense);
 
-        service.save(expense, true);
+        service.save(expense, false, true);
 
         assertEquals(nextWorkingDay.atStartOfDay(), expense.getTransactionDate());
         verify(calendarService, times(1)).getDate(nonWorkingDate.toLocalDate());
+        verify(repository, times(1)).save(expense);
+    }
+
+    @Test
+    @DisplayName("Should not change transaction date when recurring expense falls on a working day")
+    void save_WhenRecurringAndDateIsWorkingDay_ShouldNotAdjustDate() {
+        User user = buildUser();
+        Category category = buildCategory(user);
+        LocalDateTime date = LocalDateTime.of(2026, 6, 13, 0, 0);
+
+        Expense expense = buildExpense(user, category.getId(), date);
+        CalendarDTO calendarDTO = new CalendarDTO(date.toLocalDate(), true, null, null);
+
+        doReturn(category).when(categoryService).findByIdAndOwnerOrOwnerIsNull(category.getId(), user);
+        doReturn(calendarDTO).when(calendarService).getDate(date.toLocalDate());
+        doReturn(false).when(repository).existsDuplicate(user.getId(), category.getId(), expense.getPrice(), date, expense.getDescription());
+        doReturn(Expense.builder().id(UUID.randomUUID()).build()).when(repository).save(expense);
+
+        service.save(expense, true, true);
+
+        assertEquals(date, expense.getTransactionDate());
+        verify(calendarService, times(1)).getDate(date.toLocalDate());
+        verify(budgetService, never()).validateTransactionRespectsBudget(any(), any(), any());
+        verify(repository, times(1)).save(expense);
+    }
+
+    @Test
+    @DisplayName("Should shift transaction date to next working day when recurring expense falls on a non-working day")
+    void save_WhenRecurringAndDateIsNonWorkingDay_ShouldShiftToNextWorkingDay() {
+        User user = buildUser();
+        Category category = buildCategory(user);
+        LocalDateTime nonWorkingDate = LocalDateTime.of(2026, 6, 14, 0, 0);
+        LocalDate nextWorkingDay = LocalDate.of(2026, 6, 15);
+
+        Expense expense = buildExpense(user, category.getId(), nonWorkingDate);
+        CalendarDTO calendarDTO = new CalendarDTO(nonWorkingDate.toLocalDate(), false, "Domingo", nextWorkingDay);
+
+        doReturn(category).when(categoryService).findByIdAndOwnerOrOwnerIsNull(category.getId(), user);
+        doReturn(calendarDTO).when(calendarService).getDate(nonWorkingDate.toLocalDate());
+        doReturn(false).when(repository).existsDuplicate(user.getId(), category.getId(), expense.getPrice(), nextWorkingDay.atStartOfDay(), expense.getDescription());
+        doReturn(Expense.builder().id(UUID.randomUUID()).build()).when(repository).save(expense);
+
+        service.save(expense, true, true);
+
+        assertEquals(nextWorkingDay.atStartOfDay(), expense.getTransactionDate());
+        verify(calendarService, times(1)).getDate(nonWorkingDate.toLocalDate());
+        verify(budgetService, never()).validateTransactionRespectsBudget(any(), any(), any());
         verify(repository, times(1)).save(expense);
     }
 
@@ -219,7 +266,7 @@ class ExpenseServiceImplTest {
         doThrow(new ExternalServiceException("calendar-api", new RuntimeException("connection refused")))
                 .when(calendarService).getDate(date.toLocalDate());
 
-        assertThrows(ExternalServiceException.class, () -> service.save(expense, false));
+        assertThrows(ExternalServiceException.class, () -> service.save(expense, false, true));
 
         verify(repository, never()).save(any());
     }

@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.UUID;
 
 public interface IExpenseService {
-    Expense save(Expense expense, boolean skipBudget);
+    Expense save(Expense expense, boolean isRecurring, boolean skipBudget);
     Expense findById(User user, UUID id);
     Page<Expense> findAll(User user, Pageable pageable);
     void delete(User user, UUID id);

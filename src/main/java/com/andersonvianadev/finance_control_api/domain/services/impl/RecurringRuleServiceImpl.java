@@ -181,6 +181,10 @@ public class RecurringRuleServiceImpl implements IRecurringRuleService {
                 .transactionDate(transactionDate)
                 .build();
 
-        expenseService.save(expense, true);
+        try {
+            expenseService.save(expense, true,true);
+        } catch (ResourceAlreadyExistsException e) {
+            log.warn("Expense already generated for rule={} on date={}", rule.getId(), transactionDate.toLocalDate());
+        }
     }
 }
