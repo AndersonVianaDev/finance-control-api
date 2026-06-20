@@ -133,7 +133,7 @@ class RecurringRuleServiceImplTest {
                 LocalDateTime.of(2026, 1, 15, 0, 0));
 
         doReturn(List.of(rule)).when(repository).findAllByIsActiveTrue();
-        doReturn(Expense.builder().id(UUID.randomUUID()).build()).when(expenseService).save(any(), eq(true));
+        doReturn(Expense.builder().id(UUID.randomUUID()).build()).when(expenseService).save(any(), eq(true), eq(true));
 
         try (MockedStatic<LocalDate> mock = Mockito.mockStatic(LocalDate.class, Mockito.CALLS_REAL_METHODS)) {
             mock.when(LocalDate::now).thenReturn(today);
@@ -141,7 +141,7 @@ class RecurringRuleServiceImplTest {
             service.processRecurringOccurrences();
         }
 
-        verify(expenseService, times(1)).save(any(), eq(true));
+        verify(expenseService, times(1)).save(any(), eq(true), eq(true));
         verify(incomeService, never()).save(any(), anyBoolean());
     }
 
@@ -160,7 +160,7 @@ class RecurringRuleServiceImplTest {
             service.processRecurringOccurrences();
         }
 
-        verify(expenseService, never()).save(any(), anyBoolean());
+        verify(expenseService, never()).save(any(), anyBoolean(), anyBoolean());
         verify(incomeService, never()).save(any(), anyBoolean());
     }
 
@@ -183,7 +183,7 @@ class RecurringRuleServiceImplTest {
         }
 
         verify(incomeService, times(1)).save(any(), eq(true));
-        verify(expenseService, never()).save(any(), anyBoolean());
+        verify(expenseService, never()).save(any(), anyBoolean(), anyBoolean());
     }
 
     @Test
@@ -207,6 +207,26 @@ class RecurringRuleServiceImplTest {
     }
 
     @Test
+    @DisplayName("Should skip expense generation when expense already exists for today")
+    void processRecurringOccurrences_WhenExpenseAlreadyExists_ShouldSkipGeneration() {
+        LocalDate today = LocalDate.of(2026, 6, 15);
+        RecurringRule rule = buildRuleWithDate(TransactionPeriodType.MONTHLY, RecurringType.EXPENSE,
+                LocalDateTime.of(2026, 1, 15, 0, 0));
+
+        doReturn(List.of(rule)).when(repository).findAllByIsActiveTrue();
+        doThrow(new ResourceAlreadyExistsException("Expense already registered"))
+                .when(expenseService).save(any(), eq(true), eq(true));
+
+        try (MockedStatic<LocalDate> mock = Mockito.mockStatic(LocalDate.class, Mockito.CALLS_REAL_METHODS)) {
+            mock.when(LocalDate::now).thenReturn(today);
+
+            service.processRecurringOccurrences();
+        }
+
+        verify(expenseService, times(1)).save(any(), eq(true), eq(true));
+    }
+
+    @Test
     @DisplayName("Should continue processing remaining rules when one expense generation fails")
     void processRecurringOccurrences_WhenExpenseServiceThrows_ShouldContinueProcessing() {
         LocalDate today = LocalDate.of(2026, 6, 15);
@@ -216,7 +236,7 @@ class RecurringRuleServiceImplTest {
                 LocalDateTime.of(2026, 1, 15, 0, 0));
 
         doReturn(List.of(failingRule, incomeRule)).when(repository).findAllByIsActiveTrue();
-        doThrow(new RuntimeException("unexpected error")).when(expenseService).save(any(), eq(true));
+        doThrow(new RuntimeException("unexpected error")).when(expenseService).save(any(), eq(true), eq(true));
         doReturn(Income.builder().id(UUID.randomUUID()).build()).when(incomeService).save(any(), eq(true));
 
         try (MockedStatic<LocalDate> mock = Mockito.mockStatic(LocalDate.class, Mockito.CALLS_REAL_METHODS)) {
@@ -225,7 +245,7 @@ class RecurringRuleServiceImplTest {
             service.processRecurringOccurrences();
         }
 
-        verify(expenseService, times(1)).save(any(), eq(true));
+        verify(expenseService, times(1)).save(any(), eq(true), eq(true));
         verify(incomeService, times(1)).save(any(), eq(true));
     }
 

@@ -36,7 +36,7 @@ public class ExpenseServiceImpl implements IExpenseService {
     private final ICalendarService calendarService;
 
     @Override
-    public Expense save(Expense expense, boolean skipBudget) {
+    public Expense save(Expense expense, boolean isRecurring, boolean skipBudget) {
         User owner = expense.getOwner();
 
         Category category = expense.getCategory();
@@ -47,7 +47,7 @@ public class ExpenseServiceImpl implements IExpenseService {
 
         boolean isInstallment = expense.getInstallmentPlan() != null;
 
-        if(isInstallment) {
+        if(isInstallment || isRecurring) {
             LocalDateTime transactionDate = expense.getTransactionDate();
             CalendarDTO calendarDTO = calendarService.getDate(transactionDate.toLocalDate());
 

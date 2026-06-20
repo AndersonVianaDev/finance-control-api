@@ -129,7 +129,7 @@ class InstallmentPlanServiceImplTest {
 
         doReturn(category).when(categoryService).findByIdAndOwnerOrOwnerIsNull(category.getId(), user);
         doReturn(savedPlan).when(repository).save(any());
-        doReturn(savedFirstExpense).when(expenseService).save(any(), any(Boolean.class));
+        doReturn(savedFirstExpense).when(expenseService).save(any(), any(Boolean.class), any(Boolean.class));
 
         CreationResultDTO result = service.create(planRequest, false);
 
@@ -140,7 +140,7 @@ class InstallmentPlanServiceImplTest {
 
         verify(categoryService, times(1)).findByIdAndOwnerOrOwnerIsNull(category.getId(), user);
         verify(repository, times(1)).save(any());
-        verify(expenseService, times(1)).save(any(), any(Boolean.class));
+        verify(expenseService, times(1)).save(any(), any(Boolean.class), any(Boolean.class));
         verify(sqsMessageSender, times(1)).send(anyString(), any(InstallmentGenerationMessage.class));
     }
 
@@ -173,7 +173,7 @@ class InstallmentPlanServiceImplTest {
         assertThrows(NotFoundException.class, () -> service.create(planRequest, false));
 
         verify(repository, never()).save(any());
-        verify(expenseService, never()).save(any(), any(Boolean.class));
+        verify(expenseService, never()).save(any(), any(Boolean.class), any(Boolean.class));
         verify(sqsMessageSender, never()).send(anyString(), any());
     }
 
@@ -230,11 +230,11 @@ class InstallmentPlanServiceImplTest {
 
         doReturn(category).when(categoryService).findByIdAndOwnerOrOwnerIsNull(category.getId(), user);
         doReturn(savedPlan).when(repository).save(any());
-        doAnswer(inv -> savedFirstExpense).when(expenseService).save(any(), any(Boolean.class));
+        doAnswer(inv -> savedFirstExpense).when(expenseService).save(any(), any(Boolean.class), any(Boolean.class));
 
         service.create(planRequest, true);
 
-        verify(expenseService, times(1)).save(any(), any(Boolean.class));
+        verify(expenseService, times(1)).save(any(), any(Boolean.class), any(Boolean.class));
         verify(sqsMessageSender, times(1)).send(anyString(), any(InstallmentGenerationMessage.class));
     }
 
@@ -283,7 +283,7 @@ class InstallmentPlanServiceImplTest {
         doReturn(category).when(categoryService).findByIdAndOwnerOrOwnerIsNull(category.getId(), user);
         doReturn(savedPlan).when(repository).save(any());
         doThrow(new ExternalServiceException("calendar-api", new RuntimeException("connection refused")))
-                .when(expenseService).save(any(), any(Boolean.class));
+                .when(expenseService).save(any(), any(Boolean.class), any(Boolean.class));
 
         assertThrows(ExternalServiceException.class, () -> service.create(planRequest, false));
 
@@ -329,7 +329,7 @@ class InstallmentPlanServiceImplTest {
         service.generateRemainingInstallments(planId, false);
 
         // installments 2..12 = 11 saves
-        verify(expenseService, times(11)).save(any(), any(Boolean.class));
+        verify(expenseService, times(11)).save(any(), any(Boolean.class), any(Boolean.class));
     }
 
     @Test
@@ -342,7 +342,7 @@ class InstallmentPlanServiceImplTest {
         assertThrows(NotFoundException.class,
                 () -> service.generateRemainingInstallments(planId, false));
 
-        verify(expenseService, never()).save(any(), any(Boolean.class));
+        verify(expenseService, never()).save(any(), any(Boolean.class), any(Boolean.class));
     }
 
     @Test
@@ -379,7 +379,7 @@ class InstallmentPlanServiceImplTest {
 
         doReturn(Optional.of(plan)).when(repository).findById(planId);
         doThrow(new ExternalServiceException("calendar-api", new RuntimeException("connection refused")))
-                .when(expenseService).save(any(), any(Boolean.class));
+                .when(expenseService).save(any(), any(Boolean.class), any(Boolean.class));
 
         assertThrows(ExternalServiceException.class,
                 () -> service.generateRemainingInstallments(planId, false));
@@ -691,6 +691,6 @@ class InstallmentPlanServiceImplTest {
         service.generateRemainingInstallments(planId, true);
 
         // installments 2..3 = 2 saves, all with skipBudget=true
-        verify(expenseService, times(2)).save(any(), any(Boolean.class));
+        verify(expenseService, times(2)).save(any(), any(Boolean.class), any(Boolean.class));
     }
 }
