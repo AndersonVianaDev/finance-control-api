@@ -16,11 +16,13 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -78,5 +80,20 @@ public class InstallmentPlanController implements IInstallmentPlanController {
     ) {
         service.cancel(user, id);
         return ResponseEntity.noContent().build();
+    }
+
+    @Override
+    @GetMapping(params = {"start", "finish"})
+    public ResponseEntity<PageResponseDTO<InstallmentPlanResponseDTO>> findBetweenFirstDueDate(
+            @AuthenticationPrincipal(expression = "user") User user,
+            @RequestParam(value = "start") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate start,
+            @RequestParam(value = "finish") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate finish,
+            @PageableDefault(size = 10) Pageable pageable
+    ) {
+        Page<InstallmentPlanResponseDTO> responsePage = service.findBetweenFirstDueDate(
+                user, start, finish, pageable
+        ).map(InstallmentPlanMapper::toResponse);
+
+        return ResponseEntity.ok(PageResponseDTO.of(responsePage));
     }
 }

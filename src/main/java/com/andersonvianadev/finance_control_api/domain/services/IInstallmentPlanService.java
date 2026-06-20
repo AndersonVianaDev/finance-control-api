@@ -6,6 +6,7 @@ import com.andersonvianadev.finance_control_api.domain.models.dtos.CreationResul
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
+import java.time.LocalDate;
 import java.util.UUID;
 
 public interface IInstallmentPlanService {
@@ -14,4 +15,5 @@ public interface IInstallmentPlanService {
     InstallmentPlan findById(User user, UUID id);
     Page<InstallmentPlan> findAll(User user, Pageable pageable);
     void cancel(User user, UUID id);
+    Page<InstallmentPlan> findBetweenFirstDueDate(User user, LocalDate start, LocalDate finish, Pageable pageable);
 }
