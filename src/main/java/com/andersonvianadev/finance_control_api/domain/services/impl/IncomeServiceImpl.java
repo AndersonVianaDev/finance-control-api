@@ -13,6 +13,8 @@ import com.andersonvianadev.finance_control_api.infra.repositories.IncomeReposit
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -85,5 +87,10 @@ public class IncomeServiceImpl implements IIncomeService {
     public Income findById(User user, UUID id) {
         return repository.findByOwnerIdAndId(user.getId(), id)
                 .orElseThrow(() -> new NotFoundException(String.format("User with id %s not found", id)));
+    }
+
+    @Override
+    public Page<Income> findAll(User user, Pageable pageable) {
+        return repository.findByOwnerId(user.getId(), pageable);
     }
 }

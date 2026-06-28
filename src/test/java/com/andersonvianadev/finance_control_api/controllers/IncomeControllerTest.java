@@ -1,7 +1,10 @@
 package com.andersonvianadev.finance_control_api.controllers;
 
+import com.andersonvianadev.finance_control_api.controllers.dtos.requests.ExpenseRequestDTO;
 import com.andersonvianadev.finance_control_api.controllers.dtos.requests.IncomeRequestDTO;
+import com.andersonvianadev.finance_control_api.controllers.dtos.responses.ExpenseResponseDTO;
 import com.andersonvianadev.finance_control_api.controllers.dtos.responses.IncomeResponseDTO;
+import com.andersonvianadev.finance_control_api.controllers.dtos.responses.PageResponseDTO;
 import com.andersonvianadev.finance_control_api.domain.models.Category;
 import com.andersonvianadev.finance_control_api.domain.models.Income;
 import com.andersonvianadev.finance_control_api.domain.models.User;
@@ -29,14 +32,14 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.test.web.servlet.result.MockMvcResultHandlers;
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
+import tools.jackson.databind.JavaType;
 import tools.jackson.databind.ObjectMapper;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 
 @SpringBootTest
@@ -335,6 +338,66 @@ class IncomeControllerTest {
         );
 
         assertEquals(HttpStatus.NOT_FOUND.value(), exception.status());
+    }
+
+    @Test
+    @DisplayName("Should return paginated incomes for authenticated user")
+    void findAll_WhenUserHasIncomes_ShouldReturnPaginatedResults() throws Exception {
+        User owner = createUser();
+        UserPrincipal principal = new UserPrincipal(owner);
+
+        Category category = createCategory(owner, "Salary");
+
+        for (int i = 1; i <= 3; i++) {
+            createIncome(
+                    owner,
+                    category,
+                    LocalDateTime.now().plusMonths(i),
+                    new BigDecimal(4500),
+                    "salario mensal"
+            );
+        }
+
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.get("/incomes")
+                        .with(user(principal))
+                        .param("page", "0")
+                        .param("size", "10"))
+                .andExpect(MockMvcResultMatchers.status().isOk())
+                .andDo(MockMvcResultHandlers.print())
+                .andReturn();
+
+        JavaType pageType = objectMapper.getTypeFactory()
+                .constructParametricType(PageResponseDTO.class, IncomeResponseDTO.class);
+        PageResponseDTO<IncomeResponseDTO> response = objectMapper.readValue(
+                result.getResponse().getContentAsString(), pageType);
+
+        assertEquals(3, response.totalElement());
+        assertEquals(3, response.content().size());
+        assertEquals(0, response.page());
+        assertEquals(1, response.totalPages());
+        assertTrue(response.last());
+    }
+
+    @Test
+    @DisplayName("Should return empty page when user has no incomes")
+    void findAll_WhenUserHasNoIncomes_ShouldReturnEmptyPage() throws Exception {
+        User user = createUser();
+        UserPrincipal principal = new UserPrincipal(user);
+
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.get("/incomes")
+                        .with(user(principal)))
+                .andExpect(MockMvcResultMatchers.status().isOk())
+                .andDo(MockMvcResultHandlers.print())
+                .andReturn();
+
+        JavaType pageType = objectMapper.getTypeFactory()
+                .constructParametricType(PageResponseDTO.class, IncomeResponseDTO.class);
+        PageResponseDTO<IncomeResponseDTO> response = objectMapper.readValue(
+                result.getResponse().getContentAsString(), pageType);
+
+        assertEquals(0, response.totalElement());
+        assertTrue(response.content().isEmpty());
+        assertTrue(response.last());
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────

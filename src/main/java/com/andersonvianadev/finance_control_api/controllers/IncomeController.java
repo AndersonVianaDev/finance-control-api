@@ -3,13 +3,18 @@ package com.andersonvianadev.finance_control_api.controllers;
 import com.andersonvianadev.finance_control_api.controllers.docs.IIncomeController;
 import com.andersonvianadev.finance_control_api.controllers.dtos.requests.IncomeRequestDTO;
 import com.andersonvianadev.finance_control_api.controllers.dtos.responses.IncomeResponseDTO;
+import com.andersonvianadev.finance_control_api.controllers.dtos.responses.PageResponseDTO;
 import com.andersonvianadev.finance_control_api.controllers.mappers.IncomeMapper;
 import com.andersonvianadev.finance_control_api.domain.models.Income;
 import com.andersonvianadev.finance_control_api.domain.models.User;
 import com.andersonvianadev.finance_control_api.domain.services.IIncomeService;
+import com.andersonvianadev.finance_control_api.infra.repositories.IncomeRepository;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -46,5 +51,16 @@ public class IncomeController implements IIncomeController {
         Income income = service.findById(user, id);
         IncomeResponseDTO response = IncomeMapper.toResponse(income);
         return ResponseEntity.ok(response);
+    }
+
+    @Override
+    @GetMapping
+    public ResponseEntity<PageResponseDTO<IncomeResponseDTO>> findAll(
+            @AuthenticationPrincipal(expression = "user") User user,
+            @PageableDefault Pageable pageable
+    ) {
+        Page<IncomeResponseDTO> page = service.findAll(user, pageable)
+                .map(IncomeMapper::toResponse);
+        return ResponseEntity.ok(PageResponseDTO.of(page));
     }
 }
