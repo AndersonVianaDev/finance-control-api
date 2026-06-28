@@ -17,10 +17,15 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -189,6 +194,39 @@ class IncomeServiceImplTest {
         doReturn(Optional.empty()).when(repository).findByOwnerIdAndId(owner.getId(), incomeId);
 
         assertThrows(NotFoundException.class, () -> service.findById(owner, incomeId));
+    }
+
+    @Test
+    @DisplayName("Should return paginated incomes for user")
+    void findAll_WhenIncomesExist_ShouldReturnPage() {
+        User owner = buildUser();
+        Category category = buildCategory(owner);
+        Pageable pageable = PageRequest.of(0, 10);
+        Income income = buildIncome(owner, category.getId(), LocalDateTime.now());
+        Page<Income> page = new PageImpl<>(List.of(income), pageable, 1);
+
+        doReturn(page).when(repository).findByOwnerId(owner.getId(), pageable);
+
+        Page<Income> result = service.findAll(owner, pageable);
+
+        assertEquals(1, result.getTotalElements());
+        assertEquals(income, result.getContent().getFirst());
+        verify(repository, times(1)).findByOwnerId(owner.getId(), pageable);
+    }
+
+    @Test
+    @DisplayName("Should return empty page when user has no incomes")
+    void findAll_WhenNoIncomesExist_ShouldReturnEmptyPage() {
+        User owner = buildUser();
+        Pageable pageable = PageRequest.of(0, 10);
+        Page<Income> page = new PageImpl<>(List.of(), pageable, 0);
+
+        doReturn(page).when(repository).findByOwnerId(owner.getId(), pageable);
+
+        Page<Income> result = service.findAll(owner, pageable);
+
+        assertEquals(0, result.getTotalElements());
+        verify(repository, times(1)).findByOwnerId(owner.getId(), pageable);
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────

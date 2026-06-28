@@ -1,6 +1,8 @@
 package com.andersonvianadev.finance_control_api.infra.repositories;
 
 import com.andersonvianadev.finance_control_api.domain.models.Income;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -33,4 +35,6 @@ public interface IncomeRepository extends JpaRepository<Income, UUID> {
     );
 
     Optional<Income> findByOwnerIdAndId(UUID ownerId, UUID id);
+
+    Page<Income> findByOwnerId(UUID ownerId, Pageable pageable);
 }

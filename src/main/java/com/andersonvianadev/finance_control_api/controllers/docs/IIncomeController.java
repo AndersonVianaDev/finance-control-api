@@ -2,6 +2,7 @@ package com.andersonvianadev.finance_control_api.controllers.docs;
 
 import com.andersonvianadev.finance_control_api.controllers.dtos.requests.IncomeRequestDTO;
 import com.andersonvianadev.finance_control_api.controllers.dtos.responses.IncomeResponseDTO;
+import com.andersonvianadev.finance_control_api.controllers.dtos.responses.PageResponseDTO;
 import com.andersonvianadev.finance_control_api.domain.models.User;
 import com.andersonvianadev.finance_control_api.infra.exceptions.StandardException;
 import io.swagger.v3.oas.annotations.Operation;
@@ -13,6 +14,8 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -274,5 +277,88 @@ public interface IIncomeController {
             @AuthenticationPrincipal(expression = "user") User user,
             @Parameter(description = "Income UUID.", required = true)
             @PathVariable UUID id
+    );
+
+    @GetMapping
+    @Operation(
+            summary = "List incomes",
+            description = """
+                    Returns a paginated list of incomes belonging to the authenticated user.
+                    Pagination query parameters:
+                        - page: page number (0-indexed, default: 0)
+                        - size: page size (default: 10)
+                        - sort: sorting criteria (e.g. sort=transactionDate,desc)
+                    """,
+            security = @SecurityRequirement(name = "bearerAuth"),
+            responses = {
+                    @ApiResponse(
+                            responseCode = "200",
+                            description = "retrieved successfully.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = IncomeResponseDTO.class),
+                                    examples = @ExampleObject(
+                                            name = "Incomes page.",
+                                            value = """
+                                                    {
+                                                        "content": [
+                                                            {
+                                                                "id": "a1b2c3d4-0000-1111-2222-333344445555",
+                                                                "transactionDate": "2026-06-05T00:00:00",
+                                                                "price": 5000.00,
+                                                                "description": "Monthly salary",
+                                                                "category": {
+                                                                    "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+                                                                    "name": "salary",
+                                                                    "description": "Employment income",
+                                                                    "icon": "wallet",
+                                                                    "owner": {
+                                                                        "id": "9cb12d90-4623-41c2-b3fc-1a963f77bcf1",
+                                                                        "name": "Anderson",
+                                                                        "email": "anderson@gmail.com"
+                                                                    }
+                                                                },
+                                                                "owner": {
+                                                                    "id": "9cb12d90-4623-41c2-b3fc-1a963f77bcf1",
+                                                                    "name": "Anderson",
+                                                                    "email": "anderson@gmail.com"
+                                                                }
+                                                            }
+                                                        ],
+                                                        "page": 0,
+                                                        "size": 10,
+                                                        "totalElement": 1,
+                                                        "totalPages": 1,
+                                                        "last": true
+                                                    }
+                                                    """
+                                    )
+                            )
+                    ),
+                    @ApiResponse(
+                            responseCode = "401",
+                            description = "Unauthorized. Missing or invalid JWT token.",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(implementation = StandardException.class),
+                                    examples = @ExampleObject(
+                                            name = "Missing or invalid token.",
+                                            value = """
+                                                    {
+                                                        "timestamp": "2026-06-07T09:00:00Z",
+                                                        "status": 401,
+                                                        "error": "Unauthorized",
+                                                        "path": "/nix-finance-api/incomes"
+                                                    }
+                                                    """
+                                    )
+                            )
+                    )
+            }
+    )
+    ResponseEntity<PageResponseDTO<IncomeResponseDTO>> findAll(
+            @Parameter(hidden = true)
+            @AuthenticationPrincipal(expression = "user") User user,
+            @PageableDefault Pageable pageable
     );
 }
