@@ -8,6 +8,7 @@ import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
@@ -30,4 +31,6 @@ public interface IncomeRepository extends JpaRepository<Income, UUID> {
             @Param("transactionDate") LocalDateTime transactionDate,
             @Param("description") String description
     );
+
+    Optional<Income> findByOwnerIdAndId(UUID ownerId, UUID id);
 }

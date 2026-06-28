@@ -7,6 +7,7 @@ import com.andersonvianadev.finance_control_api.domain.models.dtos.CalendarDTO;
 import com.andersonvianadev.finance_control_api.domain.services.ICalendarService;
 import com.andersonvianadev.finance_control_api.domain.services.ICategoryService;
 import com.andersonvianadev.finance_control_api.domain.services.IIncomeService;
+import com.andersonvianadev.finance_control_api.infra.exceptions.NotFoundException;
 import com.andersonvianadev.finance_control_api.infra.exceptions.ResourceAlreadyExistsException;
 import com.andersonvianadev.finance_control_api.infra.repositories.IncomeRepository;
 import lombok.RequiredArgsConstructor;
@@ -78,5 +79,11 @@ public class IncomeServiceImpl implements IIncomeService {
             );
             throw new ResourceAlreadyExistsException("Income already registered");
         }
+    }
+
+    @Override
+    public Income findById(User user, UUID id) {
+        return repository.findByOwnerIdAndId(user.getId(), id)
+                .orElseThrow(() -> new NotFoundException(String.format("User with id %s not found", id)));
     }
 }
