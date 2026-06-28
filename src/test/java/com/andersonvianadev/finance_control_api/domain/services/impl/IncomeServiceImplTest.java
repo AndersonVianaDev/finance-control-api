@@ -21,16 +21,12 @@ import org.springframework.dao.DataIntegrityViolationException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class IncomeServiceImplTest {
@@ -168,6 +164,31 @@ class IncomeServiceImplTest {
         assertThrows(ResourceAlreadyExistsException.class, () -> service.save(income, false));
 
         verify(repository, times(1)).save(income);
+    }
+
+    @Test
+    @DisplayName("Should return income when it exists and belongs to user")
+    void findById_WhenIncomeExists_ShouldReturnIncome() {
+        User owner = buildUser();
+        Category category = buildCategory(owner);
+        Income income = buildIncome(owner, category.getId(), LocalDateTime.now());
+
+        doReturn(Optional.of(income)).when(repository).findByOwnerIdAndId(owner.getId(), income.getId());
+
+        Income response = service.findById(owner, income.getId());
+
+        assertEquals(income, response);
+    }
+
+    @Test
+    @DisplayName("Should throw NotFoundException when income does not exist")
+    void findById_WhenIncomeDoesNotExist_ShouldThrowNotFoundException() {
+        User owner = buildUser();
+        UUID incomeId = UUID.randomUUID();
+
+        doReturn(Optional.empty()).when(repository).findByOwnerIdAndId(owner.getId(), incomeId);
+
+        assertThrows(NotFoundException.class, () -> service.findById(owner, incomeId));
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────

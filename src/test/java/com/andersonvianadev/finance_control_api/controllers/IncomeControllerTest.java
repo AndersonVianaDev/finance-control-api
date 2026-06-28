@@ -290,6 +290,53 @@ class IncomeControllerTest {
                 .andDo(MockMvcResultHandlers.print());
     }
 
+    @Test
+    @DisplayName("Should return 200 with income when ID exists and belongs to user")
+    void findById_WhenIncomeExistsAndBelongsToUser_ShouldReturnOk() throws Exception {
+        User owner = createUser();
+        UserPrincipal principal = new UserPrincipal(owner);
+
+        Category category = createCategory(owner, "Salary");
+        Income income = createIncome(owner, category, LocalDateTime.now(), new BigDecimal(4250), "Salario mensal");
+
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.get("/incomes/" + income.getId())
+                .with(user(principal))
+                .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(MockMvcResultMatchers.status().isOk())
+                .andDo(MockMvcResultHandlers.print())
+                .andReturn();
+
+        IncomeResponseDTO response = objectMapper.readValue(
+                result.getResponse().getContentAsString(),
+                IncomeResponseDTO.class
+        );
+
+        assertEquals(income.getId(), response.id());
+        assertEquals(income.getOwner(), owner);
+    }
+
+    @Test
+    @DisplayName("Should return 404 when income ID does not exist")
+    void findById_WhenIncomeDoesNotExist_ShouldReturnNotFound() throws Exception {
+        User owner = createUser();
+        UserPrincipal principal = new UserPrincipal(owner);
+        UUID incomeId = UUID.randomUUID();
+
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.get("/incomes/"+incomeId)
+                .with(user(principal))
+                .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(MockMvcResultMatchers.status().isNotFound())
+                .andDo(MockMvcResultHandlers.print())
+                .andReturn();
+
+        StandardException exception = objectMapper.readValue(
+                result.getResponse().getContentAsString(),
+                StandardException.class
+        );
+
+        assertEquals(HttpStatus.NOT_FOUND.value(), exception.status());
+    }
+
     // ── helpers ──────────────────────────────────────────────────────────────
 
     private User createUser() {
