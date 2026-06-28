@@ -34,7 +34,32 @@ public interface IncomeRepository extends JpaRepository<Income, UUID> {
             @Param("description") String description
     );
 
+    @Query(value = """
+            SELECT EXISTS (
+                SELECT 1 FROM tb_incomes
+                WHERE owner_id = :ownerId
+                  AND category_id = :categoryId
+                  AND price = :price
+                  AND transaction_date = :transactionDate
+                  AND description = :description
+                  AND id != :excludeId
+            )
+            """, nativeQuery = true)
+    boolean existsDuplicateExcluding(
+            @Param("ownerId") UUID ownerId,
+            @Param("categoryId") UUID categoryId,
+            @Param("price") BigDecimal price,
+            @Param("transactionDate") LocalDateTime transactionDate,
+            @Param("description") String description,
+            @Param("excludeId") UUID excludeId
+    );
+
     Optional<Income> findByOwnerIdAndId(UUID ownerId, UUID id);
 
     Page<Income> findByOwnerId(UUID ownerId, Pageable pageable);
+
+    Page<Income> findByOwnerIdAndTransactionDateBetween(
+            UUID ownerId, LocalDateTime start,
+            LocalDateTime finish, Pageable pageable
+    );
 }
