@@ -171,6 +171,8 @@ class IncomeServiceImplTest {
         verify(repository, times(1)).save(income);
     }
 
+    // ── findById ─────────────────────────────────────────────────────────────
+
     @Test
     @DisplayName("Should return income when it exists and belongs to user")
     void findById_WhenIncomeExists_ShouldReturnIncome() {
@@ -195,6 +197,8 @@ class IncomeServiceImplTest {
 
         assertThrows(NotFoundException.class, () -> service.findById(owner, incomeId));
     }
+
+    // ── findAll ──────────────────────────────────────────────────────────────
 
     @Test
     @DisplayName("Should return paginated incomes for user")
@@ -227,6 +231,287 @@ class IncomeServiceImplTest {
 
         assertEquals(0, result.getTotalElements());
         verify(repository, times(1)).findByOwnerId(owner.getId(), pageable);
+    }
+
+    // ── delete ───────────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("Should delete income successfully when it exists and belongs to user")
+    void delete_WhenIncomeExists_ShouldDelete() {
+        User user = buildUser();
+        Category category = buildCategory(user);
+        UUID incomeId = UUID.randomUUID();
+        Income income = buildIncome(user, category.getId(), LocalDateTime.of(2026, 6, 5, 0, 0));
+        income.setId(incomeId);
+
+        doReturn(Optional.of(income)).when(repository).findByOwnerIdAndId(user.getId(), incomeId);
+        doNothing().when(repository).delete(income);
+
+        service.delete(user, incomeId);
+
+        verify(repository, times(1)).delete(income);
+    }
+
+    @Test
+    @DisplayName("Should throw NotFoundException when income to delete does not exist")
+    void delete_WhenIncomeDoesNotExist_ShouldThrowNotFoundException() {
+        User user = buildUser();
+        UUID incomeId = UUID.randomUUID();
+
+        doReturn(Optional.empty()).when(repository).findByOwnerIdAndId(user.getId(), incomeId);
+
+        assertThrows(NotFoundException.class, () -> service.delete(user, incomeId));
+
+        verify(repository, never()).delete(any());
+    }
+
+    // ── update ───────────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("Should update price and description and return updated income")
+    void update_WhenValidFieldsChanged_ShouldSaveAndReturnIncome() {
+        User user = buildUser();
+        Category category = buildCategory(user);
+        UUID incomeId = UUID.randomUUID();
+        LocalDateTime date = LocalDateTime.of(2026, 6, 5, 0, 0);
+
+        Income existing = Income.builder()
+                .id(incomeId).owner(user).category(category)
+                .price(new BigDecimal("5000.00")).description("Monthly salary")
+                .transactionDate(date).build();
+
+        Income input = Income.builder()
+                .id(incomeId).owner(user)
+                .price(new BigDecimal("5500.00"))
+                .description("Updated monthly salary")
+                .category(Category.builder().id(null).build())
+                .build();
+
+        doReturn(Optional.of(existing)).when(repository).findByOwnerIdAndId(user.getId(), incomeId);
+        doReturn(false).when(repository).existsDuplicateExcluding(
+                user.getId(), category.getId(), new BigDecimal("5500.00"), date, "Updated monthly salary", incomeId);
+        doReturn(existing).when(repository).save(existing);
+
+        Income result = service.update(input);
+
+        verify(repository, times(1)).save(existing);
+        assertEquals(existing, result);
+    }
+
+    @Test
+    @DisplayName("Should resolve and apply new category when category changes")
+    void update_WhenCategoryChanged_ShouldResolveNewCategoryAndUpdate() {
+        User user = buildUser();
+        Category oldCategory = buildCategory(user);
+        Category newCategory = Category.builder().id(UUID.randomUUID()).name("freelance").owner(user).build();
+        UUID incomeId = UUID.randomUUID();
+        LocalDateTime date = LocalDateTime.of(2026, 6, 5, 0, 0);
+
+        Income existing = Income.builder()
+                .id(incomeId).owner(user).category(oldCategory)
+                .price(new BigDecimal("5000.00")).description("Monthly salary")
+                .transactionDate(date).build();
+
+        Income input = Income.builder()
+                .id(incomeId).owner(user)
+                .category(Category.builder().id(newCategory.getId()).build())
+                .build();
+
+        doReturn(Optional.of(existing)).when(repository).findByOwnerIdAndId(user.getId(), incomeId);
+        doReturn(newCategory).when(categoryService).findByIdAndOwnerOrOwnerIsNull(newCategory.getId(), user);
+        doReturn(false).when(repository).existsDuplicateExcluding(
+                user.getId(), newCategory.getId(), new BigDecimal("5000.00"), date, "Monthly salary", incomeId);
+        doReturn(existing).when(repository).save(existing);
+
+        service.update(input);
+
+        assertEquals(newCategory, existing.getCategory());
+        verify(categoryService, times(1)).findByIdAndOwnerOrOwnerIsNull(newCategory.getId(), user);
+        verify(repository, times(1)).save(existing);
+    }
+
+    @Test
+    @DisplayName("Should throw NotFoundException when income to update does not exist")
+    void update_WhenIncomeNotFound_ShouldThrowNotFoundException() {
+        User user = buildUser();
+        UUID incomeId = UUID.randomUUID();
+
+        Income input = Income.builder()
+                .id(incomeId).owner(user)
+                .category(Category.builder().id(null).build())
+                .build();
+
+        doReturn(Optional.empty()).when(repository).findByOwnerIdAndId(user.getId(), incomeId);
+
+        assertThrows(NotFoundException.class, () -> service.update(input));
+
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Should throw NotFoundException when new category does not exist")
+    void update_WhenNewCategoryNotFound_ShouldThrowNotFoundException() {
+        User user = buildUser();
+        Category category = buildCategory(user);
+        UUID incomeId = UUID.randomUUID();
+        UUID newCategoryId = UUID.randomUUID();
+
+        Income existing = Income.builder()
+                .id(incomeId).owner(user).category(category)
+                .price(new BigDecimal("5000.00")).description("Monthly salary")
+                .transactionDate(LocalDateTime.of(2026, 6, 5, 0, 0)).build();
+
+        Income input = Income.builder()
+                .id(incomeId).owner(user)
+                .category(Category.builder().id(newCategoryId).build())
+                .build();
+
+        doReturn(Optional.of(existing)).when(repository).findByOwnerIdAndId(user.getId(), incomeId);
+        doThrow(new NotFoundException("Category not found."))
+                .when(categoryService).findByIdAndOwnerOrOwnerIsNull(newCategoryId, user);
+
+        assertThrows(NotFoundException.class, () -> service.update(input));
+
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Should throw ResourceAlreadyExistsException when updated values conflict with another income")
+    void update_WhenResultIsDuplicate_ShouldThrowResourceAlreadyExistsException() {
+        User user = buildUser();
+        Category category = buildCategory(user);
+        UUID incomeId = UUID.randomUUID();
+        LocalDateTime date = LocalDateTime.of(2026, 6, 5, 0, 0);
+
+        Income existing = Income.builder()
+                .id(incomeId).owner(user).category(category)
+                .price(new BigDecimal("5000.00")).description("Monthly salary")
+                .transactionDate(date).build();
+
+        Income input = Income.builder()
+                .id(incomeId).owner(user)
+                .price(new BigDecimal("4000.00"))
+                .category(Category.builder().id(null).build())
+                .build();
+
+        doReturn(Optional.of(existing)).when(repository).findByOwnerIdAndId(user.getId(), incomeId);
+        doReturn(true).when(repository).existsDuplicateExcluding(
+                user.getId(), category.getId(), new BigDecimal("4000.00"), date, "Monthly salary", incomeId);
+
+        assertThrows(ResourceAlreadyExistsException.class, () -> service.update(input));
+
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Should throw ResourceAlreadyExistsException when database constraint is violated on update")
+    void update_WhenDataIntegrityViolationOccurs_ShouldThrowResourceAlreadyExistsException() {
+        User user = buildUser();
+        Category category = buildCategory(user);
+        UUID incomeId = UUID.randomUUID();
+        LocalDateTime date = LocalDateTime.of(2026, 6, 5, 0, 0);
+
+        Income existing = Income.builder()
+                .id(incomeId).owner(user).category(category)
+                .price(new BigDecimal("5000.00")).description("Monthly salary")
+                .transactionDate(date).build();
+
+        Income input = Income.builder()
+                .id(incomeId).owner(user)
+                .description("New description")
+                .category(Category.builder().id(null).build())
+                .build();
+
+        doReturn(Optional.of(existing)).when(repository).findByOwnerIdAndId(user.getId(), incomeId);
+        doReturn(false).when(repository).existsDuplicateExcluding(
+                user.getId(), category.getId(), new BigDecimal("5000.00"), date, "New description", incomeId);
+        doThrow(new DataIntegrityViolationException("constraint")).when(repository).save(any());
+
+        assertThrows(ResourceAlreadyExistsException.class, () -> service.update(input));
+    }
+
+    @Test
+    @DisplayName("Should update only description when only description changes")
+    void update_WhenOnlyDescriptionChanges_ShouldUpdateOnlyDescription() {
+        User user = buildUser();
+        Category category = buildCategory(user);
+        UUID incomeId = UUID.randomUUID();
+        LocalDateTime date = LocalDateTime.of(2026, 6, 5, 0, 0);
+
+        Income existing = Income.builder()
+                .id(incomeId).owner(user).category(category)
+                .price(new BigDecimal("5000.00")).description("Monthly salary")
+                .transactionDate(date).build();
+
+        Income input = Income.builder()
+                .id(incomeId).owner(user)
+                .description("Annual salary bonus")
+                .category(Category.builder().id(null).build())
+                .build();
+
+        doReturn(Optional.of(existing)).when(repository).findByOwnerIdAndId(user.getId(), incomeId);
+        doReturn(false).when(repository).existsDuplicateExcluding(
+                user.getId(), category.getId(), new BigDecimal("5000.00"), date, "Annual salary bonus", incomeId);
+        doReturn(existing).when(repository).save(existing);
+
+        service.update(input);
+
+        verify(categoryService, never()).findByIdAndOwnerOrOwnerIsNull(any(), any());
+        verify(repository, times(1)).save(existing);
+        assertEquals("Annual salary bonus", existing.getDescription());
+        assertEquals(new BigDecimal("5000.00"), existing.getPrice());
+    }
+
+    // ── findBetweenTransactionDate ────────────────────────────────────────────
+
+    @Test
+    @DisplayName("Should return page with incomes when incomes exist within the given date range")
+    void findBetweenTransactionDate_WhenIncomesExistInRange_ShouldReturnPage() {
+        User user = buildUser();
+        Category category = buildCategory(user);
+        Pageable pageable = PageRequest.of(0, 10);
+
+        LocalDateTime start = LocalDateTime.of(2026, 6, 1, 0, 0);
+        LocalDateTime finish = LocalDateTime.of(2026, 6, 30, 23, 59, 59, 999_999_999);
+
+        Income income = Income.builder()
+                .id(UUID.randomUUID()).owner(user).category(category)
+                .transactionDate(LocalDateTime.of(2026, 6, 5, 0, 0))
+                .price(new BigDecimal("5000.00")).description("Monthly salary")
+                .build();
+
+        Page<Income> expectedPage = new PageImpl<>(List.of(income), pageable, 1);
+
+        doReturn(expectedPage).when(repository)
+                .findByOwnerIdAndTransactionDateBetween(user.getId(), start, finish, pageable);
+
+        Page<Income> result = service.findBetweenTransactionDate(user, start, finish, pageable);
+
+        assertEquals(1, result.getTotalElements());
+        assertEquals(income, result.getContent().getFirst());
+        verify(repository, times(1))
+                .findByOwnerIdAndTransactionDateBetween(user.getId(), start, finish, pageable);
+    }
+
+    @Test
+    @DisplayName("Should return empty page when no incomes exist within the given date range")
+    void findBetweenTransactionDate_WhenNoIncomesInRange_ShouldReturnEmptyPage() {
+        User user = buildUser();
+        Pageable pageable = PageRequest.of(0, 10);
+
+        LocalDateTime start = LocalDateTime.of(2026, 1, 1, 0, 0);
+        LocalDateTime finish = LocalDateTime.of(2026, 1, 31, 23, 59, 59, 999_999_999);
+
+        Page<Income> emptyPage = new PageImpl<>(List.of(), pageable, 0);
+
+        doReturn(emptyPage).when(repository)
+                .findByOwnerIdAndTransactionDateBetween(user.getId(), start, finish, pageable);
+
+        Page<Income> result = service.findBetweenTransactionDate(user, start, finish, pageable);
+
+        assertEquals(0, result.getTotalElements());
+        verify(repository, times(1))
+                .findByOwnerIdAndTransactionDateBetween(user.getId(), start, finish, pageable);
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────
