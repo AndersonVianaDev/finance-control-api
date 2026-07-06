@@ -1,6 +1,7 @@
 package com.andersonvianadev.finance_control_api.infra.repositories;
 
 import com.andersonvianadev.finance_control_api.domain.models.RecurringRule;
+import com.andersonvianadev.finance_control_api.domain.models.enums.RecurringType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -33,5 +34,12 @@ public interface RecurringRuleRepository extends JpaRepository<RecurringRule, UU
             LocalDateTime transactionDate,
             String description,
             UUID id
+    );
+
+    List<RecurringRule> findByOwnerIdAndRecurringTypeAndTransactionDateBetween(
+            UUID ownerId,
+            RecurringType recurringType,
+            LocalDateTime start,
+            LocalDateTime finish
     );
 }

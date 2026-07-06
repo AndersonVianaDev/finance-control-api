@@ -138,6 +138,19 @@ public class RecurringRuleServiceImpl implements IRecurringRuleService {
         return repository.save(existing);
     }
 
+    @Override
+    public List<RecurringRule> findByRangeDateAndType(User user, LocalDate start, LocalDate finish, RecurringType type) {
+        LocalDateTime startTime = start.atStartOfDay();
+        LocalDateTime finishTime = finish.atTime(23, 59, 59);
+
+        return repository.findByOwnerIdAndRecurringTypeAndTransactionDateBetween(
+                user.getId(),
+                type,
+                startTime,
+                finishTime
+        );
+    }
+
     private boolean isDueToday(RecurringRule rule, LocalDate today) {
         LocalDateTime ruleDate = rule.getTransactionDate();
         if (rule.getTransactionPeriodType() == TransactionPeriodType.MONTHLY) {
@@ -182,7 +195,7 @@ public class RecurringRuleServiceImpl implements IRecurringRuleService {
                 .build();
 
         try {
-            expenseService.save(expense, true,true);
+            expenseService.save(expense, true, true);
         } catch (ResourceAlreadyExistsException e) {
             log.warn("Expense already generated for rule={} on date={}", rule.getId(), transactionDate.toLocalDate());
         }
