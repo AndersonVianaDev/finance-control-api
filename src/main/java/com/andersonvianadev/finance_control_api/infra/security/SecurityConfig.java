@@ -50,8 +50,4 @@ public class SecurityConfig {
         return authenticationConfiguration.getAuthenticationManager();
     }
 
-    @Bean
-    public CorrelationIdFilter correlationIdFilter() {
-        return new CorrelationIdFilter();
-    }
 }
