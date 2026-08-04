@@ -81,4 +81,28 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
             UUID ownerId, LocalDateTime start,
             LocalDateTime finish, Pageable pageable
     );
+
+    @Query("SELECT COALESCE(SUM(e.price), 0) FROM Expense e " +
+            "WHERE e.owner.id = :ownerId " +
+            "AND e.transactionDate >= :start AND e.transactionDate < :finish")
+    BigDecimal sumByOwnerAndDateRange(
+            @Param("ownerId") UUID ownerId,
+            @Param("start") LocalDateTime start,
+            @Param("finish") LocalDateTime finish);
+
+    @Query("SELECT COUNT(e) FROM Expense e " +
+            "WHERE e.owner.id = :ownerId " +
+            "AND e.transactionDate >= :start AND e.transactionDate < :finish")
+    Long countByOwnerAndDateRange(
+            @Param("ownerId") UUID ownerId,
+            @Param("start") LocalDateTime start,
+            @Param("finish") LocalDateTime finish);
+
+    @Query("SELECT e FROM Expense e " +
+            "WHERE e.owner.id = :ownerId " +
+            "AND e.transactionDate >= :start AND e.transactionDate < :finish")
+    List<Expense> findScheduledByOwnerAndDateRange(
+            @Param("ownerId") UUID ownerId,
+            @Param("start") LocalDateTime start,
+            @Param("finish") LocalDateTime finish);
 }

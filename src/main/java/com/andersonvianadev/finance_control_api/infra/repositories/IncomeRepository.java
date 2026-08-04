@@ -9,7 +9,9 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -62,4 +64,28 @@ public interface IncomeRepository extends JpaRepository<Income, UUID> {
             UUID ownerId, LocalDateTime start,
             LocalDateTime finish, Pageable pageable
     );
+
+    @Query("SELECT COALESCE(SUM(i.price), 0) FROM Income i " +
+            "WHERE i.owner.id = :ownerId " +
+            "AND i.transactionDate >= :start AND i.transactionDate < :finish")
+    BigDecimal sumByOwnerAndDateRange(
+            @Param("ownerId") UUID ownerId,
+            @Param("start") LocalDateTime start,
+            @Param("finish") LocalDateTime finish);
+
+    @Query("SELECT COUNT(i) FROM Income i " +
+            "WHERE i.owner.id = :ownerId " +
+            "AND i.transactionDate >= :start AND i.transactionDate < :finish")
+    Long countByOwnerAndDateRange(
+            @Param("ownerId") UUID ownerId,
+            @Param("start") LocalDateTime start,
+            @Param("finish") LocalDateTime finish);
+
+    @Query("SELECT i FROM Income i " +
+            "WHERE i.owner.id = :ownerId " +
+            "AND i.transactionDate >= :start AND i.transactionDate < :finish")
+    List<Income> findScheduledByOwnerAndDateRange(
+            @Param("ownerId") UUID ownerId,
+            @Param("start") LocalDateTime start,
+            @Param("finish") LocalDateTime finish);
 }

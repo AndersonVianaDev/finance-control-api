@@ -1,15 +1,15 @@
 package com.andersonvianadev.finance_control_api.domain.services.impl;
 
-import com.andersonvianadev.finance_control_api.domain.models.Category;
-import com.andersonvianadev.finance_control_api.domain.models.Income;
-import com.andersonvianadev.finance_control_api.domain.models.User;
+import com.andersonvianadev.finance_control_api.domain.models.*;
 import com.andersonvianadev.finance_control_api.domain.models.dtos.CalendarDTO;
+import com.andersonvianadev.finance_control_api.domain.models.enums.RecurringType;
 import com.andersonvianadev.finance_control_api.domain.services.ICalendarService;
 import com.andersonvianadev.finance_control_api.domain.services.ICategoryService;
 import com.andersonvianadev.finance_control_api.domain.services.IIncomeService;
 import com.andersonvianadev.finance_control_api.infra.exceptions.NotFoundException;
 import com.andersonvianadev.finance_control_api.infra.exceptions.ResourceAlreadyExistsException;
 import com.andersonvianadev.finance_control_api.infra.repositories.IncomeRepository;
+import com.andersonvianadev.finance_control_api.infra.repositories.RecurringRuleRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,7 +19,10 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Slf4j
@@ -30,6 +33,7 @@ public class IncomeServiceImpl implements IIncomeService {
     private final IncomeRepository repository;
     private final ICategoryService categoryService;
     private final ICalendarService calendarService;
+    private final RecurringRuleRepository recurringRuleRepository;
 
     @Override
     public Income save(Income income, boolean isRecurring) {
@@ -160,5 +164,64 @@ public class IncomeServiceImpl implements IIncomeService {
     @Override
     public Page<Income> findBetweenTransactionDate(User user, LocalDateTime start, LocalDateTime finish, Pageable pageable) {
         return repository.findByOwnerIdAndTransactionDateBetween(user.getId(), start, finish, pageable);
+    }
+
+    @Override
+    public BigDecimal sumByOwnerAndDateRange(User user, LocalDate start, LocalDate finish) {
+        return repository.sumByOwnerAndDateRange(
+                user.getId(),
+                start.atStartOfDay(),
+                finish.plusDays(1).atStartOfDay());
+    }
+
+    @Override
+    public Integer countByOwnerAndDateRange(User user, LocalDate start, LocalDate finish) {
+        return repository.countByOwnerAndDateRange(
+                user.getId(),
+                start.atStartOfDay(),
+                finish.plusDays(1).atStartOfDay()).intValue();
+    }
+
+    @Override
+    public List<Income> findProjectedIncomesByDateRange(User user, LocalDate start, LocalDate finish) {
+        List<Income> projectedIncomes = new ArrayList<>();
+
+        List<RecurringRule> recurringRules = recurringRuleRepository.findByOwnerIdAndRecurringTypeAndTransactionDateBetween(
+                user.getId(), RecurringType.INCOME, start.atStartOfDay(), finish.atTime(23, 59, 59));
+
+        for(RecurringRule recurring : recurringRules) {
+            User owner = recurring.getOwner();
+            Category category = recurring.getCategory();
+
+            boolean exists = repository.existsDuplicate(
+                    owner.getId(),
+                    category.getId(),
+                    recurring.getPrice(),
+                    recurring.getTransactionDate(),
+                    recurring.getDescription()
+            );
+
+            if(!exists) {
+                Income income = Income.builder()
+                        .transactionDate(recurring.getTransactionDate())
+                        .price(recurring.getPrice())
+                        .description(recurring.getDescription())
+                        .owner(recurring.getOwner())
+                        .category(recurring.getCategory())
+                        .build();
+
+                projectedIncomes.add(income);
+            }
+        }
+
+        return projectedIncomes;
+    }
+
+    @Override
+    public List<Income> findScheduledIncomesByDateRange(User user, LocalDate start, LocalDate finish) {
+        return repository.findScheduledByOwnerAndDateRange(
+                user.getId(),
+                start.atStartOfDay(),
+                finish.plusDays(1).atStartOfDay());
     }
 }

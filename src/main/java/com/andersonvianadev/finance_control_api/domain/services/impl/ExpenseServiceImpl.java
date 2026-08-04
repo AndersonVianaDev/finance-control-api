@@ -2,16 +2,16 @@ package com.andersonvianadev.finance_control_api.domain.services.impl;
 
 import com.andersonvianadev.finance_control_api.domain.models.Category;
 import com.andersonvianadev.finance_control_api.domain.models.Expense;
+import com.andersonvianadev.finance_control_api.domain.models.RecurringRule;
 import com.andersonvianadev.finance_control_api.domain.models.User;
 import com.andersonvianadev.finance_control_api.domain.models.dtos.CalendarDTO;
-import com.andersonvianadev.finance_control_api.domain.services.IBudgetService;
-import com.andersonvianadev.finance_control_api.domain.services.ICalendarService;
-import com.andersonvianadev.finance_control_api.domain.services.ICategoryService;
-import com.andersonvianadev.finance_control_api.domain.services.IExpenseService;
+import com.andersonvianadev.finance_control_api.domain.models.enums.RecurringType;
+import com.andersonvianadev.finance_control_api.domain.services.*;
 import com.andersonvianadev.finance_control_api.infra.exceptions.OperationNotAllowedException;
 import com.andersonvianadev.finance_control_api.infra.exceptions.NotFoundException;
 import com.andersonvianadev.finance_control_api.infra.exceptions.ResourceAlreadyExistsException;
 import com.andersonvianadev.finance_control_api.infra.repositories.ExpenseRepository;
+import com.andersonvianadev.finance_control_api.infra.repositories.RecurringRuleRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,8 +21,11 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Slf4j
@@ -31,6 +34,7 @@ import java.util.UUID;
 public class ExpenseServiceImpl implements IExpenseService {
 
     private final ExpenseRepository repository;
+    private final RecurringRuleRepository recurringRuleRepository;
     private final ICategoryService categoryService;
     private final IBudgetService budgetService;
     private final ICalendarService calendarService;
@@ -206,5 +210,64 @@ public class ExpenseServiceImpl implements IExpenseService {
                 user.getId(), start,
                 finish, pageable
         );
+    }
+
+    @Override
+    public BigDecimal sumByOwnerAndDateRange(User user, LocalDate start, LocalDate finish) {
+        return repository.sumByOwnerAndDateRange(
+                user.getId(),
+                start.atStartOfDay(),
+                finish.plusDays(1).atStartOfDay());
+    }
+
+    @Override
+    public Integer countByOwnerAndDateRange(User user, LocalDate start, LocalDate finish) {
+        return repository.countByOwnerAndDateRange(
+                user.getId(),
+                start.atStartOfDay(),
+                finish.plusDays(1).atStartOfDay()).intValue();
+    }
+
+    @Override
+    public List<Expense> findProjectedExpensesByDateRange(User user, LocalDate start, LocalDate finish) {
+        List<Expense> projectedExpenses = new ArrayList<>();
+
+        List<RecurringRule> recurringRules = recurringRuleRepository.findByOwnerIdAndRecurringTypeAndTransactionDateBetween(
+                user.getId(), RecurringType.EXPENSE, start.atStartOfDay(), finish.atTime(23, 59, 59));
+
+        for(RecurringRule recurring : recurringRules) {
+            User owner = recurring.getOwner();
+            Category category = recurring.getCategory();
+
+            boolean exists = repository.existsDuplicate(
+                    owner.getId(),
+                    category.getId(),
+                    recurring.getPrice(),
+                    recurring.getTransactionDate(),
+                    recurring.getDescription()
+            );
+
+            if(!exists) {
+                Expense expense = Expense.builder()
+                        .transactionDate(recurring.getTransactionDate())
+                        .price(recurring.getPrice())
+                        .description(recurring.getDescription())
+                        .owner(recurring.getOwner())
+                        .category(recurring.getCategory())
+                        .build();
+
+                projectedExpenses.add(expense);
+            }
+        }
+
+        return projectedExpenses;
+    }
+
+    @Override
+    public List<Expense> findScheduledExpensesByDateRange(User user, LocalDate start, LocalDate finish) {
+        return repository.findScheduledByOwnerAndDateRange(
+                user.getId(),
+                start.atStartOfDay(),
+                finish.plusDays(1).atStartOfDay());
     }
 }
